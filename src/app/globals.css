@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  /* Airbnb Design + LatamAutos accent */
+  --bg: #f7f7f7;
+  --surface: #ffffff;
+  --ink: #222222;
+  --muted: #717171;
+  --border: #ebebeb;
+  --accent: #ff385c;
+  --accent-hover: #e31c5f;
+  --accent-soft: #fff0f3;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 8%);
+  --shadow-md: 0 6px 16px rgb(0 0 0 / 8%);
+  --radius: 12px;
+  --background: var(--bg);
+  --foreground: var(--ink);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-cereal);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-cereal), system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
