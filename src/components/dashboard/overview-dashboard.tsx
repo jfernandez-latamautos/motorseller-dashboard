@@ -17,9 +17,13 @@ import { ActivityChart } from "@/components/dashboard/activity-chart";
 import { ModuleAdoptionChart } from "@/components/dashboard/module-adoption-chart";
 import { CountrySplit } from "@/components/dashboard/country-split";
 import { DefinitionsBanner } from "@/components/dashboard/definitions-banner";
-import { computeKpis, formatNumber, moduleAdoptionRate } from "@/lib/metrics";
+import {
+  computeKpis,
+  formatNumber,
+  formatPercent,
+  moduleAdoptionRate,
+} from "@/lib/metrics";
 import { MODULES } from "@/lib/mock-data";
-import { formatPercent } from "@/lib/metrics";
 
 export function OverviewDashboard() {
   const { filteredDealers, dealers, filters } = useFilters();
@@ -81,7 +85,16 @@ export function OverviewDashboard() {
           />
         </section>
 
-        {/* Mobile: adoption gaps as tappable list */}
+        <section className="grid gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-3">
+            <ActivityChart />
+          </div>
+          <div className="lg:col-span-2">
+            <CountrySplit dealers={filteredDealers} />
+          </div>
+        </section>
+
+        {/* Mobile shortcut list */}
         <section className="md:hidden">
           <div className="mb-2 flex items-center justify-between">
             <h2 className="text-base font-bold text-[var(--ink)]">
@@ -109,29 +122,13 @@ export function OverviewDashboard() {
           </ul>
         </section>
 
-        <section className="hidden gap-5 md:grid xl:grid-cols-5">
-          <div className="xl:col-span-3">
-            <ActivityChart />
-          </div>
-          <div className="xl:col-span-2">
-            <CountrySplit dealers={filteredDealers} />
-          </div>
-        </section>
-
-        {/* Mobile compact country */}
-        <section className="md:hidden">
-          <CountrySplit dealers={filteredDealers} />
-        </section>
-
         <section className="hidden md:block">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-[var(--ink)]">
                 Adopción por módulo
               </h2>
-              <p className="text-sm text-[var(--muted)]">
-                Detalle en Módulos
-              </p>
+              <p className="text-sm text-[var(--muted)]">Detalle en Módulos</p>
             </div>
             <Link
               href="/modules"

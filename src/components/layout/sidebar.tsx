@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { LayoutDashboard, Building2, Boxes } from "lucide-react";
@@ -18,13 +17,14 @@ export function Sidebar() {
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] md:flex">
       <div className="border-b border-[var(--border)] px-5 py-4">
-        <Image
+        {/* img nativo evita mismatch de hidratación de next/image */}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
           src="/logo-laa.png"
           alt="LatamAutos"
           width={200}
           height={40}
           className="h-8 w-auto object-contain object-left"
-          priority
         />
         <p className="mt-2 text-[11px] font-semibold text-[var(--muted)]">
           Motor Seller · Dashboard v1

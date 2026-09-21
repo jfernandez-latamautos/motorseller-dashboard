@@ -65,9 +65,12 @@ export const MODULES: ModuleDefinition[] = [
 
 const MODULE_KEYS = MODULES.map((m) => m.key);
 
+/** Ancla fija para evitar mismatch de hidratación server/client */
+const MOCK_NOW = new Date("2026-09-21T12:00:00.000Z");
+
 function daysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
+  const d = new Date(MOCK_NOW);
+  d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString();
 }
 

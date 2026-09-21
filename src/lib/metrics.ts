@@ -112,8 +112,10 @@ export function engagementLevel(dealer: Dealer): EngagementLevel {
   if (dealer.accessType === "crm_only") return "dormant";
   if (!dealer.lastLoginAt) return "dormant";
 
+  /** Misma ancla que mock-data para SSR estable */
+  const now = new Date("2026-09-21T12:00:00.000Z").getTime();
   const daysSinceLogin =
-    (Date.now() - new Date(dealer.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24);
+    (now - new Date(dealer.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24);
 
   if (daysSinceLogin > 21) return "dormant";
 

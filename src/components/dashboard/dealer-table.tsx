@@ -14,9 +14,8 @@ import {
   EngagementBadge,
   TierBadge,
 } from "@/components/ui/badges";
+import { RelativeTime } from "@/components/ui/relative-time";
 import { MODULES } from "@/lib/mock-data";
-import { formatDistanceToNow } from "date-fns";
-import { es } from "date-fns/locale";
 
 export function DealerTable({
   dealers,
@@ -75,12 +74,7 @@ export function DealerTable({
                   {engagementScore(dealer)}
                 </span>
                 {!compact && dealer.lastLoginAt ? (
-                  <span>
-                    {formatDistanceToNow(new Date(dealer.lastLoginAt), {
-                      addSuffix: true,
-                      locale: es,
-                    })}
-                  </span>
+                  <RelativeTime date={dealer.lastLoginAt} />
                 ) : null}
               </div>
             </li>
@@ -150,12 +144,10 @@ export function DealerTable({
                     </td>
                     {!compact ? (
                       <td className="px-4 py-3.5 text-[var(--muted)]">
-                        {dealer.lastLoginAt
-                          ? formatDistanceToNow(new Date(dealer.lastLoginAt), {
-                              addSuffix: true,
-                              locale: es,
-                            })
-                          : "Nunca"}
+                        <RelativeTime
+                          date={dealer.lastLoginAt}
+                          fallback="Nunca"
+                        />
                       </td>
                     ) : null}
                   </tr>

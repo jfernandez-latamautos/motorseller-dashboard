@@ -1,20 +1,15 @@
 "use client";
 
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Legend,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 import { ACTIVITY_TREND } from "@/lib/mock-data";
+
+const max = Math.max(
+  ...ACTIVITY_TREND.map((d) => Math.max(d.web, d.mobile)),
+  1
+);
 
 export function ActivityChart() {
   return (
-    <div className="h-full rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-sm)]">
+    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] md:p-5">
       <div className="mb-4">
         <h2 className="text-base font-bold text-[var(--ink)]">
           Actividad web vs móvil
@@ -23,39 +18,40 @@ export function ActivityChart() {
           Sesiones semanales de agencias con acceso al panel
         </p>
       </div>
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={ACTIVITY_TREND} barGap={4}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ebebeb" vertical={false} />
-            <XAxis
-              dataKey="week"
-              tick={{ fill: "#717171", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <YAxis
-              tick={{ fill: "#717171", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-            />
-            <Tooltip
-              contentStyle={{
-                borderRadius: 12,
-                border: "1px solid #ebebeb",
-                fontSize: 12,
-                boxShadow: "0 6px 16px rgb(0 0 0 / 8%)",
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="web" name="Web" fill="#222222" radius={[6, 6, 0, 0]} />
-            <Bar
-              dataKey="mobile"
-              name="Móvil"
-              fill="#ff385c"
-              radius={[6, 6, 0, 0]}
-            />
-          </BarChart>
-        </ResponsiveContainer>
+
+      <div className="mb-3 flex items-center gap-4 text-xs font-semibold">
+        <span className="flex items-center gap-1.5 text-[var(--ink)]">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm bg-[#222]" /> Web
+        </span>
+        <span className="flex items-center gap-1.5 text-[var(--ink)]">
+          <i className="inline-block h-2.5 w-2.5 rounded-sm bg-[var(--accent)]" />{" "}
+          Móvil
+        </span>
+      </div>
+
+      <div className="flex h-52 items-end gap-2 sm:gap-3">
+        {ACTIVITY_TREND.map((row) => (
+          <div
+            key={row.week}
+            className="flex min-w-0 flex-1 flex-col items-center gap-2"
+          >
+            <div className="flex h-40 w-full items-end justify-center gap-1">
+              <div
+                className="w-[42%] max-w-7 rounded-t-md bg-[#222]"
+                style={{ height: `${(row.web / max) * 100}%` }}
+                title={`Web: ${row.web}`}
+              />
+              <div
+                className="w-[42%] max-w-7 rounded-t-md bg-[var(--accent)]"
+                style={{ height: `${(row.mobile / max) * 100}%` }}
+                title={`Móvil: ${row.mobile}`}
+              />
+            </div>
+            <span className="truncate text-[10px] font-medium text-[var(--muted)] sm:text-[11px]">
+              {row.week}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );
