@@ -35,7 +35,7 @@ export function BottomNav() {
                   active ? "text-[var(--accent)]" : "text-[var(--muted)]"
                 )}
               >
-                <Icon className={cn("h-5 w-5", active && "stroke-[2.5]")} />
+                <Icon className="h-5 w-5" strokeWidth={active ? 2.5 : 2} />
                 {tab.label}
               </Link>
             </li>

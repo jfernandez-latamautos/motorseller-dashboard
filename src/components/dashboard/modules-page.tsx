@@ -1,10 +1,10 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { useFilters } from "@/components/filters/filter-context";
 import { TopFilters } from "@/components/layout/top-filters";
 import { MODULES } from "@/lib/mock-data";
+import { isModuleKey } from "@/lib/modules";
 import {
   engagementLevel,
   formatNumber,
@@ -28,8 +28,6 @@ const CATEGORY_LABEL: Record<ModuleCategory, string> = {
   general: "General",
 };
 
-const MODULE_KEYS = new Set(MODULES.map((m) => m.key));
-
 type UsageSegment = "all" | "not_adopted" | "low" | "adopted";
 type SortDir = "asc" | "desc";
 
@@ -44,19 +42,19 @@ function moduleUsage(dealer: Dealer, key: ModuleKey) {
   );
 }
 
-function isModuleKey(value: string | null): value is ModuleKey {
-  return Boolean(value && MODULE_KEYS.has(value as ModuleKey));
-}
-
-function ModulesExplorer() {
-  const searchParams = useSearchParams();
+function ModulesExplorer({
+  initialKey,
+}: {
+  initialKey: ModuleKey | null;
+}) {
   const { filteredDealers, filters } = useFilters();
-
-  const raw = searchParams.get("m");
-  const selectedKey = isModuleKey(raw) ? raw : null;
-
+  const [selectedKey, setSelectedKey] = useState<ModuleKey | null>(initialKey);
   const [segment, setSegment] = useState<UsageSegment>("not_adopted");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+
+  useEffect(() => {
+    setSelectedKey(initialKey);
+  }, [initialKey]);
 
   useEffect(() => {
     setSegment("not_adopted");
@@ -91,10 +89,10 @@ function ModulesExplorer() {
   }, [panel, filteredDealers, lowThreshold]);
 
   const selected = selectedKey
-    ? MODULES.find((m) => m.key === selectedKey) ?? null
+    ? (MODULES.find((m) => m.key === selectedKey) ?? null)
     : null;
   const selectedStats = selectedKey
-    ? summary.find((s) => s.mod.key === selectedKey) ?? null
+    ? (summary.find((s) => s.mod.key === selectedKey) ?? null)
     : null;
 
   const agencyRows = useMemo(() => {
@@ -123,6 +121,26 @@ function ModulesExplorer() {
     });
     return rows;
   }, [panel, selectedKey, segment, sortDir, lowThreshold]);
+
+  const selectModule = (key: ModuleKey) => {
+    setSelectedKey(key);
+    window.history.pushState(null, "", `/modules/${key}`);
+  };
+
+  const clearModule = () => {
+    setSelectedKey(null);
+    window.history.pushState(null, "", "/modules");
+  };
+
+  useEffect(() => {
+    const onPopState = () => {
+      const parts = window.location.pathname.split("/");
+      const maybeKey = parts[2] ?? null;
+      setSelectedKey(isModuleKey(maybeKey) ? maybeKey : null);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   const exportRows = () => {
     if (!selected) return;
@@ -166,6 +184,10 @@ function ModulesExplorer() {
           selected ? (
             <a
               href="/modules"
+              onClick={(e) => {
+                e.preventDefault();
+                clearModule();
+              }}
               className="inline-flex h-10 items-center gap-1 rounded-full border border-[var(--border)] px-3 text-sm font-semibold md:hidden"
             >
               <ArrowLeft className="h-4 w-4" />
@@ -176,7 +198,6 @@ function ModulesExplorer() {
       />
 
       <div className="flex flex-1 flex-col md:flex-row md:gap-5 md:p-6">
-        {/* Un solo catálogo */}
         <div
           className={cn(
             "bg-[var(--surface)] md:flex md:w-[300px] md:shrink-0 md:flex-col md:overflow-hidden md:rounded-2xl md:border md:border-[var(--border)]",
@@ -194,7 +215,11 @@ function ModulesExplorer() {
                 className="border-b border-[var(--border)] last:border-0"
               >
                 <a
-                  href={`/modules?m=${row.mod.key}`}
+                  href={`/modules/${row.mod.key}`}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    selectModule(row.mod.key);
+                  }}
                   className={cn(
                     "flex w-full items-center gap-3 px-4 py-4 text-left transition-colors hover:bg-[var(--bg)]",
                     selectedKey === row.mod.key && "bg-[var(--accent-soft)]"
@@ -221,7 +246,6 @@ function ModulesExplorer() {
           </ul>
         </div>
 
-        {/* Detalle */}
         <div
           className={cn(
             "min-w-0 flex-1 md:overflow-y-auto",
@@ -417,14 +441,10 @@ function SegmentCard({
   );
 }
 
-export function ModulesPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="p-6 text-sm text-[var(--muted)]">Cargando módulos…</div>
-      }
-    >
-      <ModulesExplorer />
-    </Suspense>
-  );
+export function ModulesPage({
+  initialKey = null,
+}: {
+  initialKey?: ModuleKey | null;
+}) {
+  return <ModulesExplorer initialKey={initialKey} />;
 }

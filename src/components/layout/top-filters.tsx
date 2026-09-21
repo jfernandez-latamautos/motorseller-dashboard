@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { FilterSheet, DesktopFilters } from "@/components/layout/filter-sheet";
 import { useFilters } from "@/components/filters/filter-context";
 
@@ -21,13 +20,13 @@ export function TopFilters({
       <div className="flex items-center gap-3 px-4 py-3 md:hidden">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <Image
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
               src="/favicon.png"
               alt=""
               width={28}
               height={28}
               className="h-7 w-7 rounded-full"
-              unoptimized
             />
             <h1 className="truncate text-lg font-bold text-[var(--ink)]">
               {title}

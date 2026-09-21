@@ -1,5 +1,5 @@
 import { ModulesPage } from "@/components/dashboard/modules-page";
 
 export default function Page() {
-  return <ModulesPage />;
+  return <ModulesPage initialKey={null} />;
 }

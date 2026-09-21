@@ -17,7 +17,6 @@ export function Sidebar() {
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] md:flex">
       <div className="border-b border-[var(--border)] px-5 py-4">
-        {/* img nativo evita mismatch de hidratación de next/image */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src="/logo-laa.png"

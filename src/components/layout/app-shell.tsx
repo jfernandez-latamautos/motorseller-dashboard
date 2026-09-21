@@ -1,3 +1,5 @@
+"use client";
+
 import { Sidebar } from "@/components/layout/sidebar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { FilterProvider } from "@/components/filters/filter-context";
