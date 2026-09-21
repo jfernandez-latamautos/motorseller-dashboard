@@ -16,6 +16,7 @@ import { cn } from "@/lib/utils";
 import type { Dealer, ModuleCategory, ModuleKey } from "@/lib/types";
 import { CountryBadge, EngagementBadge } from "@/components/ui/badges";
 import { RelativeTime } from "@/components/ui/relative-time";
+import { Paginator } from "@/components/ui/paginator";
 import { ArrowLeft, ChevronRight, Download } from "lucide-react";
 import { downloadCsv } from "@/lib/export-csv";
 
@@ -27,6 +28,8 @@ const CATEGORY_LABEL: Record<ModuleCategory, string> = {
   administracion: "Administración",
   general: "General",
 };
+
+const PAGE_SIZE = 8;
 
 type UsageSegment = "all" | "not_adopted" | "low" | "adopted";
 type SortDir = "asc" | "desc";
@@ -51,6 +54,7 @@ function ModulesExplorer({
   const [selectedKey, setSelectedKey] = useState<ModuleKey | null>(initialKey);
   const [segment, setSegment] = useState<UsageSegment>("not_adopted");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     setSelectedKey(initialKey);
@@ -59,7 +63,12 @@ function ModulesExplorer({
   useEffect(() => {
     setSegment("not_adopted");
     setSortDir("asc");
+    setPage(1);
   }, [selectedKey]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [segment, sortDir, filters.search, filters.country, filters.accessType, filters.platform, filters.rangeDays]);
 
   const panel = useMemo(
     () => filteredDealers.filter((d) => d.accessType === "panel"),
@@ -121,6 +130,13 @@ function ModulesExplorer({
     });
     return rows;
   }, [panel, selectedKey, segment, sortDir, lowThreshold]);
+
+  const pageCount = Math.max(1, Math.ceil(agencyRows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pagedRows = agencyRows.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
 
   const selectModule = (key: ModuleKey) => {
     setSelectedKey(key);
@@ -337,8 +353,8 @@ function ModulesExplorer({
                 </button>
               </div>
 
-              <ul className="flex flex-col gap-3 pb-4">
-                {agencyRows.map(({ dealer, usage }) => (
+              <ul className="flex flex-col gap-3">
+                {pagedRows.map(({ dealer, usage }) => (
                   <li
                     key={dealer.id}
                     className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"
@@ -392,6 +408,15 @@ function ModulesExplorer({
                   </li>
                 ) : null}
               </ul>
+
+              <Paginator
+                page={safePage}
+                pageCount={pageCount}
+                total={agencyRows.length}
+                pageSize={PAGE_SIZE}
+                onPageChange={setPage}
+                className="mb-4"
+              />
             </div>
           ) : (
             <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-[var(--border)] text-sm text-[var(--muted)]">

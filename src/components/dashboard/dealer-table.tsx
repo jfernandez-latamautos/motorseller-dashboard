@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import {
   adoptedModulesCount,
   engagementLevel,
@@ -15,7 +16,10 @@ import {
   TierBadge,
 } from "@/components/ui/badges";
 import { RelativeTime } from "@/components/ui/relative-time";
+import { Paginator } from "@/components/ui/paginator";
 import { MODULES } from "@/lib/mock-data";
+
+const PAGE_SIZE = 10;
 
 export function DealerTable({
   dealers,
@@ -26,15 +30,32 @@ export function DealerTable({
   platform: DashboardFilters["platform"];
   compact?: boolean;
 }) {
-  const rows = [...dealers].sort(
-    (a, b) => totalSessions(b, platform) - totalSessions(a, platform)
+  const [page, setPage] = useState(1);
+
+  const rows = useMemo(
+    () =>
+      [...dealers].sort(
+        (a, b) => totalSessions(b, platform) - totalSessions(a, platform)
+      ),
+    [dealers, platform]
   );
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE_SIZE));
+  const safePage = Math.min(page, pageCount);
+  const pagedRows = rows.slice(
+    (safePage - 1) * PAGE_SIZE,
+    safePage * PAGE_SIZE
+  );
+
+  useEffect(() => {
+    setPage(1);
+  }, [dealers, platform]);
 
   return (
     <>
       {/* Mobile cards */}
       <ul className="flex flex-col gap-3 md:hidden">
-        {rows.map((dealer) => {
+        {pagedRows.map((dealer) => {
           const sessions = totalSessions(dealer, platform);
           return (
             <li
@@ -105,7 +126,7 @@ export function DealerTable({
               </tr>
             </thead>
             <tbody>
-              {rows.map((dealer) => {
+              {pagedRows.map((dealer) => {
                 const level = engagementLevel(dealer);
                 const sessions = totalSessions(dealer, platform);
                 return (
@@ -157,6 +178,14 @@ export function DealerTable({
           </table>
         </div>
       </div>
+
+      <Paginator
+        page={safePage}
+        pageCount={pageCount}
+        total={rows.length}
+        pageSize={PAGE_SIZE}
+        onPageChange={setPage}
+      />
     </>
   );
 }
