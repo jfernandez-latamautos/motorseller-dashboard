@@ -10,7 +10,12 @@ import {
   formatNumber,
   formatPercent,
   lowActivityThreshold,
+  topActivityThreshold,
+  moduleUsageBand,
   moduleAdoptionRate,
+  moduleAdoptionWithGrowth,
+  formatDeltaPoints,
+  type ModuleUsageBand,
 } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
 import type { Dealer, ModuleCategory, ModuleKey } from "@/lib/types";
@@ -31,8 +36,42 @@ const CATEGORY_LABEL: Record<ModuleCategory, string> = {
 
 const PAGE_SIZE = 8;
 
-type UsageSegment = "all" | "not_adopted" | "low" | "adopted";
+type UsageSegment = ModuleUsageBand;
 type SortDir = "asc" | "desc";
+
+const SEGMENT_META: Record<
+  UsageSegment,
+  { label: string; hint: string; help: string; accent?: boolean }
+> = {
+  none: {
+    label: "Sin uso",
+    hint: "Demos",
+    help: "No activaron el módulo · candidatos a demo",
+    accent: true,
+  },
+  low: {
+    label: "Bajo uso",
+    hint: "Activar",
+    help: "Lo probaron poco · riesgo de abandono",
+  },
+  moderate: {
+    label: "Uso moderado",
+    hint: "Crecer",
+    help: "Uso estable · oportunidad de profundizar",
+  },
+  top: {
+    label: "Top uso",
+    hint: "Champions",
+    help: "Power users · entrevistas y casos de éxito",
+  },
+};
+
+const BAND_LABEL: Record<ModuleUsageBand, string> = {
+  none: "Sin uso",
+  low: "Bajo uso",
+  moderate: "Uso moderado",
+  top: "Top uso",
+};
 
 function moduleUsage(dealer: Dealer, key: ModuleKey) {
   return (
@@ -52,7 +91,7 @@ function ModulesExplorer({
 }) {
   const { filteredDealers, filters } = useFilters();
   const [selectedKey, setSelectedKey] = useState<ModuleKey | null>(initialKey);
-  const [segment, setSegment] = useState<UsageSegment>("not_adopted");
+  const [segment, setSegment] = useState<UsageSegment>("none");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
 
@@ -61,7 +100,7 @@ function ModulesExplorer({
   }, [initialKey]);
 
   useEffect(() => {
-    setSegment("not_adopted");
+    setSegment("none");
     setSortDir("asc");
     setPage(1);
   }, [selectedKey]);
@@ -70,32 +109,43 @@ function ModulesExplorer({
     setPage(1);
   }, [segment, sortDir, filters.search, filters.country, filters.accessType, filters.platform, filters.rangeDays]);
 
+  useEffect(() => {
+    if (segment === "top" || segment === "moderate") setSortDir("desc");
+    if (segment === "none" || segment === "low") setSortDir("asc");
+  }, [segment]);
+
   const panel = useMemo(
     () => filteredDealers.filter((d) => d.accessType === "panel"),
     [filteredDealers]
   );
   const lowThreshold = lowActivityThreshold(filters.rangeDays);
+  const topThreshold = topActivityThreshold(filters.rangeDays);
 
   const summary = useMemo(() => {
     return MODULES.map((mod) => {
       const usages = panel.map((d) => ({
         dealer: d,
         usage: moduleUsage(d, mod.key),
+        band: moduleUsageBand(
+          moduleUsage(d, mod.key).adopted,
+          moduleUsage(d, mod.key).actions30d,
+          filters.rangeDays
+        ),
       }));
-      const adopted = usages.filter((u) => u.usage.adopted);
-      const notAdopted = usages.filter((u) => !u.usage.adopted);
-      const low = adopted.filter(
-        (u) => u.usage.actions30d > 0 && u.usage.actions30d < lowThreshold
-      );
+      const counts = {
+        none: usages.filter((u) => u.band === "none").length,
+        low: usages.filter((u) => u.band === "low").length,
+        moderate: usages.filter((u) => u.band === "moderate").length,
+        top: usages.filter((u) => u.band === "top").length,
+      };
       return {
         mod,
         rate: moduleAdoptionRate(filteredDealers, mod.key),
-        adoptedCount: adopted.length,
-        notAdoptedCount: notAdopted.length,
-        lowCount: low.length,
+        notAdoptedCount: counts.none,
+        counts,
       };
     }).sort((a, b) => a.rate - b.rate);
-  }, [panel, filteredDealers, lowThreshold]);
+  }, [panel, filteredDealers, filters.rangeDays]);
 
   const selected = selectedKey
     ? (MODULES.find((m) => m.key === selectedKey) ?? null)
@@ -103,33 +153,35 @@ function ModulesExplorer({
   const selectedStats = selectedKey
     ? (summary.find((s) => s.mod.key === selectedKey) ?? null)
     : null;
+  const selectedGrowth = selectedKey
+    ? (moduleAdoptionWithGrowth(filteredDealers).find(
+        (r) => r.mod.key === selectedKey
+      ) ?? null)
+    : null;
 
   const agencyRows = useMemo(() => {
     if (!selectedKey) return [];
-    let rows = panel.map((dealer) => ({
-      dealer,
-      usage: moduleUsage(dealer, selectedKey),
-    }));
+    let rows = panel.map((dealer) => {
+      const usage = moduleUsage(dealer, selectedKey);
+      return {
+        dealer,
+        usage,
+        band: moduleUsageBand(
+          usage.adopted,
+          usage.actions30d,
+          filters.rangeDays
+        ),
+      };
+    });
 
-    if (segment === "not_adopted") {
-      rows = rows.filter((r) => !r.usage.adopted);
-    } else if (segment === "adopted") {
-      rows = rows.filter((r) => r.usage.adopted);
-    } else if (segment === "low") {
-      rows = rows.filter(
-        (r) =>
-          r.usage.adopted &&
-          r.usage.actions30d > 0 &&
-          r.usage.actions30d < lowThreshold
-      );
-    }
+    rows = rows.filter((r) => r.band === segment);
 
     rows.sort((a, b) => {
       const diff = a.usage.actions30d - b.usage.actions30d;
       return sortDir === "asc" ? diff : -diff;
     });
     return rows;
-  }, [panel, selectedKey, segment, sortDir, lowThreshold]);
+  }, [panel, selectedKey, segment, sortDir, filters.rangeDays]);
 
   const pageCount = Math.max(1, Math.ceil(agencyRows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -164,22 +216,22 @@ function ModulesExplorer({
       `motorseller-${selected.key}-${segment}-${filters.rangeDays}d.csv`,
       [
         "Agencia",
-        "Código",
+        "ID",
         "País",
         "Ciudad",
-        "AM",
-        "Estado",
+        "Ejecutivo cuenta",
+        "Nivel de uso",
         "Acciones",
         "Inventario",
         "Leads",
       ],
-      agencyRows.map(({ dealer, usage }) => [
+      agencyRows.map(({ dealer, usage, band }) => [
         dealer.name,
-        dealer.agencyCode,
+        dealer.id,
         dealer.country,
         dealer.city,
         dealer.accountManager,
-        usage.adopted ? "Activo" : "Sin adoptar",
+        BAND_LABEL[band],
         usage.actions30d,
         dealer.inventoryPublished,
         dealer.leads30d,
@@ -247,7 +299,7 @@ function ModulesExplorer({
                     </p>
                     <p className="text-xs text-[var(--muted)]">
                       {CATEGORY_LABEL[row.mod.category]} ·{" "}
-                      {row.notAdoptedCount} sin usar
+                      {row.notAdoptedCount} sin uso
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
@@ -281,80 +333,72 @@ function ModulesExplorer({
                   {selected.description}
                 </p>
                 <p className="mt-2 text-xs text-[var(--muted)]">
-                  Adopción {formatPercent(selectedStats.rate)} · baja actividad
-                  bajo {lowThreshold} acciones
+                  Adopción {formatPercent(selectedStats.rate)}
+                  {selectedGrowth ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span
+                        className={
+                          selectedGrowth.deltaPp > 0
+                            ? "font-semibold text-emerald-600"
+                            : selectedGrowth.deltaPp < 0
+                              ? "font-semibold text-[var(--accent)]"
+                              : undefined
+                        }
+                      >
+                        {formatDeltaPoints(selectedGrowth.deltaPp)} vs periodo
+                        ant.
+                      </span>
+                    </>
+                  ) : null}
+                  {` · bajo <${lowThreshold} · top ≥${topThreshold} acciones`}
                 </p>
 
-                <div className="mt-4 grid grid-cols-3 gap-2">
-                  <SegmentCard
-                    label="Con módulo"
-                    value={selectedStats.adoptedCount}
-                    active={segment === "adopted"}
-                    onClick={() => setSegment("adopted")}
-                  />
-                  <SegmentCard
-                    label="Sin módulo"
-                    value={selectedStats.notAdoptedCount}
-                    active={segment === "not_adopted"}
-                    accent
-                    onClick={() => setSegment("not_adopted")}
-                  />
-                  <SegmentCard
-                    label="Baja uso"
-                    value={selectedStats.lowCount}
-                    active={segment === "low"}
-                    onClick={() => setSegment("low")}
-                  />
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {(
+                    ["none", "low", "moderate", "top"] as const
+                  ).map((key) => (
+                    <SegmentCard
+                      key={key}
+                      label={SEGMENT_META[key].label}
+                      hint={SEGMENT_META[key].hint}
+                      value={selectedStats.counts[key]}
+                      active={segment === key}
+                      accent={SEGMENT_META[key].accent}
+                      onClick={() => setSegment(key)}
+                    />
+                  ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                {(
-                  [
-                    ["not_adopted", "Sin adoptar"],
-                    ["low", "Menos uso"],
-                    ["adopted", "Adoptaron"],
-                    ["all", "Todas"],
-                  ] as const
-                ).map(([key, label]) => (
-                  <button
-                    key={key}
-                    type="button"
-                    onClick={() => setSegment(key)}
-                    className={cn(
-                      "rounded-xl px-3 py-2.5 text-xs font-semibold",
-                      segment === key
-                        ? "bg-[var(--accent)] text-white"
-                        : "bg-[var(--surface)] text-[var(--muted)] ring-1 ring-[var(--border)]"
-                    )}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-
               <div className="flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSortDir((d) => (d === "asc" ? "desc" : "asc"))
-                  }
-                  className="text-xs font-semibold text-[var(--muted)]"
-                >
-                  Acciones {sortDir === "asc" ? "↑" : "↓"}
-                </button>
-                <button
-                  type="button"
-                  onClick={exportRows}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white"
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  CSV ({agencyRows.length})
-                </button>
+                <p className="text-xs text-[var(--muted)]">
+                  {SEGMENT_META[segment].help}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSortDir((d) => (d === "asc" ? "desc" : "asc"))
+                    }
+                    className="text-xs font-semibold text-[var(--muted)]"
+                  >
+                    Acciones {sortDir === "asc" ? "↑" : "↓"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={exportRows}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--accent)] px-3.5 py-2 text-xs font-semibold text-white"
+                  >
+                    <Download className="h-3.5 w-3.5" />
+                    CSV ({agencyRows.length})
+                  </button>
+                </div>
               </div>
 
               <ul className="flex flex-col gap-3">
-                {pagedRows.map(({ dealer, usage }) => (
+                {pagedRows.map(({ dealer, usage, band }) => (
                   <li
                     key={dealer.id}
                     className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4"
@@ -365,18 +409,11 @@ function ModulesExplorer({
                           {dealer.name}
                         </p>
                         <p className="text-xs text-[var(--muted)]">
-                          {dealer.agencyCode} · {dealer.accountManager}
+                          {dealer.id} · Ejecutivo:{" "}
+                          {dealer.accountManager}
                         </p>
                       </div>
-                      {usage.adopted ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
-                          Activo
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] font-semibold text-[var(--accent)]">
-                          Sin adoptar
-                        </span>
-                      )}
+                      <UsageBandBadge band={band} />
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <CountryBadge country={dealer.country} />
@@ -404,7 +441,7 @@ function ModulesExplorer({
                 ))}
                 {agencyRows.length === 0 ? (
                   <li className="py-12 text-center text-sm text-[var(--muted)]">
-                    No hay agencias en este segmento
+                    No hay agencias en este nivel
                   </li>
                 ) : null}
               </ul>
@@ -429,14 +466,35 @@ function ModulesExplorer({
   );
 }
 
+function UsageBandBadge({ band }: { band: ModuleUsageBand }) {
+  const styles: Record<ModuleUsageBand, string> = {
+    none: "bg-[var(--accent-soft)] text-[var(--accent)]",
+    low: "bg-amber-50 text-amber-700",
+    moderate: "bg-sky-50 text-sky-700",
+    top: "bg-emerald-50 text-emerald-700",
+  };
+  return (
+    <span
+      className={cn(
+        "rounded-full px-2 py-0.5 text-[10px] font-semibold",
+        styles[band]
+      )}
+    >
+      {BAND_LABEL[band]}
+    </span>
+  );
+}
+
 function SegmentCard({
   label,
+  hint,
   value,
   onClick,
   active,
   accent,
 }: {
   label: string;
+  hint?: string;
   value: number;
   onClick: () => void;
   active?: boolean;
@@ -462,6 +520,11 @@ function SegmentCard({
       >
         {value}
       </p>
+      {hint ? (
+        <p className="mt-0.5 text-[9px] font-medium text-[var(--muted)]">
+          {hint}
+        </p>
+      ) : null}
     </button>
   );
 }

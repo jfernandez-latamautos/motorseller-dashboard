@@ -912,3 +912,27 @@ export const ACTIVITY_TREND = [
   { week: "S-1", web: 2140, mobile: 1340 },
   { week: "Actual", web: 2280, mobile: 1420 },
 ];
+
+/**
+ * Variación vs periodo anterior (prototipo).
+ * KPIs: fracción relativa (0.12 = +12%).
+ * Módulos: puntos porcentuales de adopción.
+ */
+export const PERIOD_GROWTH = {
+  leads: 0.11,
+  sessions: 0.08,
+  inventory: 0.04,
+  activeDealers: 0.06,
+  modules: {
+    tablero: 0,
+    prospectos: 3,
+    perfilador: 5,
+    contactos: 2,
+    leads: 4,
+    vehiculos: 1,
+    estadisticas: -2,
+    usuarios: 0,
+    facturacion: 1,
+    configuracion: 2,
+  } satisfies Record<ModuleKey, number>,
+};

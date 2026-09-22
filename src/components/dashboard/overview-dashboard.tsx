@@ -1,47 +1,31 @@
 "use client";
 
-import {
-  Building2,
-  Package,
-  Smartphone,
-  Users,
-  ArrowRight,
-  Info,
-} from "lucide-react";
-import Link from "next/link";
+import { Building2, Package, Smartphone, Users, Info } from "lucide-react";
 import { useState } from "react";
 import { useFilters } from "@/components/filters/filter-context";
 import { TopFilters } from "@/components/layout/top-filters";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { ActivityChart } from "@/components/dashboard/activity-chart";
-import { ModuleAdoptionChart } from "@/components/dashboard/module-adoption-chart";
 import { CountrySplit } from "@/components/dashboard/country-split";
 import { DefinitionsBanner } from "@/components/dashboard/definitions-banner";
+import { OutreachQueue } from "@/components/dashboard/outreach-queue";
+import { ModuleGrowthList } from "@/components/dashboard/growth-strip";
 import {
-  computeKpis,
+  computeKpisWithGrowth,
+  formatDeltaPercent,
   formatNumber,
-  formatPercent,
-  moduleAdoptionRate,
 } from "@/lib/metrics";
-import { MODULES } from "@/lib/mock-data";
 
 export function OverviewDashboard() {
   const { filteredDealers, dealers, filters } = useFilters();
-  const kpis = computeKpis(filteredDealers, dealers);
+  const kpis = computeKpisWithGrowth(filteredDealers, dealers);
   const [showDefs, setShowDefs] = useState(false);
-
-  const topGaps = MODULES.map((m) => ({
-    name: m.name,
-    rate: moduleAdoptionRate(filteredDealers, m.key),
-  }))
-    .sort((a, b) => a.rate - b.rate)
-    .slice(0, 4);
 
   return (
     <>
       <TopFilters title="Resumen" subtitle="Vista rápida del panel" />
 
-      <div className="flex flex-1 flex-col gap-4 p-4 md:gap-5 md:p-6">
+      <div className="flex flex-col gap-3 p-4 md:gap-4 md:p-5">
         <button
           type="button"
           onClick={() => setShowDefs((v) => !v)}
@@ -54,17 +38,21 @@ export function OverviewDashboard() {
           <DefinitionsBanner />
         </div>
 
-        <section className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+        <section className="grid grid-cols-2 gap-2.5 xl:grid-cols-4">
           <KpiCard
             label="Agencias panel"
             value={formatNumber(kpis.panelDealers)}
             hint={`${kpis.dormantDealers} inactivas`}
+            delta={formatDeltaPercent(kpis.growth.activeDealers)}
+            deltaPositive={kpis.growth.activeDealers >= 0}
             icon={Building2}
           />
           <KpiCard
             label="Inventario"
             value={formatNumber(kpis.inventoryPublished)}
             hint="publicados"
+            delta={formatDeltaPercent(kpis.growth.inventory)}
+            deltaPositive={kpis.growth.inventory >= 0}
             icon={Package}
             iconTone="amber"
           />
@@ -72,20 +60,22 @@ export function OverviewDashboard() {
             label="Leads"
             value={formatNumber(kpis.leads)}
             hint={`${filters.rangeDays} días`}
+            delta={formatDeltaPercent(kpis.growth.leads)}
+            deltaPositive={kpis.growth.leads >= 0}
             icon={Users}
             iconTone="violet"
           />
           <KpiCard
             label="Sesiones"
             value={formatNumber(kpis.webSessions + kpis.mobileSessions)}
-            delta={`${kpis.mobileShare}% móvil`}
-            deltaPositive
-            hint={`${filters.rangeDays} días`}
+            hint={`${kpis.mobileShare}% móvil · ${filters.rangeDays}d`}
+            delta={formatDeltaPercent(kpis.growth.sessions)}
+            deltaPositive={kpis.growth.sessions >= 0}
             icon={Smartphone}
           />
         </section>
 
-        <section className="grid gap-4 lg:grid-cols-5">
+        <section className="grid gap-3 lg:grid-cols-5">
           <div className="lg:col-span-3">
             <ActivityChart />
           </div>
@@ -94,50 +84,9 @@ export function OverviewDashboard() {
           </div>
         </section>
 
-        {/* Mobile shortcut list */}
-        <section className="md:hidden">
-          <div className="mb-2 flex items-center justify-between">
-            <h2 className="text-base font-bold text-[var(--ink)]">
-              Menor adopción
-            </h2>
-            <Link
-              href="/modules"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)]"
-            >
-              Ver todo <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <ul className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)]">
-            {topGaps.map((row) => (
-              <li
-                key={row.name}
-                className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3.5 last:border-0"
-              >
-                <span className="font-semibold text-[var(--ink)]">{row.name}</span>
-                <span className="text-sm font-bold text-[var(--accent)]">
-                  {formatPercent(row.rate)}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section className="hidden md:block">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-base font-bold text-[var(--ink)]">
-                Adopción por módulo
-              </h2>
-              <p className="text-sm text-[var(--muted)]">Detalle en Módulos</p>
-            </div>
-            <Link
-              href="/modules"
-              className="inline-flex items-center gap-1 text-sm font-semibold text-[var(--accent)] hover:underline"
-            >
-              Explorar <ArrowRight className="h-4 w-4" />
-            </Link>
-          </div>
-          <ModuleAdoptionChart dealers={filteredDealers} />
+        <section className="grid gap-3 lg:grid-cols-2">
+          <ModuleGrowthList dealers={filteredDealers} />
+          <OutreachQueue dealers={filteredDealers} />
         </section>
       </div>
     </>

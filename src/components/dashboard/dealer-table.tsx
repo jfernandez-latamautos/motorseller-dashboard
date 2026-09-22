@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  adoptedModulesCount,
   engagementLevel,
   engagementScore,
   formatNumber,
@@ -17,7 +16,7 @@ import {
 } from "@/components/ui/badges";
 import { RelativeTime } from "@/components/ui/relative-time";
 import { Paginator } from "@/components/ui/paginator";
-import { MODULES } from "@/lib/mock-data";
+import { formatDate } from "@/lib/utils";
 
 const PAGE_SIZE = 10;
 
@@ -68,7 +67,10 @@ export function DealerTable({
                     {dealer.name}
                   </p>
                   <p className="text-xs text-[var(--muted)]">
-                    {dealer.city} · {dealer.agencyCode}
+                    {dealer.city} · {dealer.id}
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">
+                    Ejecutivo: {dealer.accountManager}
                   </p>
                 </div>
                 <EngagementBadge level={engagementLevel(dealer)} />
@@ -80,20 +82,18 @@ export function DealerTable({
                 <TierBadge tier={dealer.tier} />
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 <Metric
                   label="Inventario"
                   value={formatNumber(dealer.inventoryPublished)}
                 />
                 <Metric label="Leads" value={formatNumber(dealer.leads30d)} />
                 <Metric label="Sesiones" value={formatNumber(sessions)} />
+                <Metric label="Alta LAA" value={formatDate(dealer.createdAt)} />
               </div>
 
               <div className="mt-3 flex items-center justify-between text-xs text-[var(--muted)]">
-                <span>
-                  Módulos {adoptedModulesCount(dealer)}/{MODULES.length} · Score{" "}
-                  {engagementScore(dealer)}
-                </span>
+                <span>Score {engagementScore(dealer)}</span>
                 {!compact && dealer.lastLoginAt ? (
                   <RelativeTime date={dealer.lastLoginAt} />
                 ) : null}
@@ -117,10 +117,10 @@ export function DealerTable({
                 <th className="px-4 py-3">Agencia</th>
                 <th className="px-4 py-3">País</th>
                 <th className="px-4 py-3">Acceso</th>
+                <th className="px-4 py-3">Alta LAA</th>
                 <th className="px-4 py-3">Inventario</th>
                 <th className="px-4 py-3">Leads</th>
                 <th className="px-4 py-3">Sesiones</th>
-                <th className="px-4 py-3">Módulos</th>
                 <th className="px-4 py-3">Actividad</th>
                 {!compact ? <th className="px-4 py-3">Último login</th> : null}
               </tr>
@@ -139,7 +139,10 @@ export function DealerTable({
                         {dealer.name}
                       </p>
                       <p className="text-[11px] text-[var(--muted)]">
-                        {dealer.agencyCode} · {dealer.city}
+                        {dealer.id} · {dealer.city}
+                      </p>
+                      <p className="text-[11px] text-[var(--muted)]">
+                        Ejecutivo: {dealer.accountManager}
                       </p>
                     </td>
                     <td className="px-4 py-3.5">
@@ -147,6 +150,9 @@ export function DealerTable({
                     </td>
                     <td className="px-4 py-3.5">
                       <AccessBadge access={dealer.accessType} />
+                    </td>
+                    <td className="px-4 py-3.5 whitespace-nowrap text-[var(--muted)]">
+                      {formatDate(dealer.createdAt)}
                     </td>
                     <td className="px-4 py-3.5 font-semibold">
                       {formatNumber(dealer.inventoryPublished)}
@@ -156,9 +162,6 @@ export function DealerTable({
                     </td>
                     <td className="px-4 py-3.5 font-semibold">
                       {formatNumber(sessions)}
-                    </td>
-                    <td className="px-4 py-3.5 font-semibold">
-                      {adoptedModulesCount(dealer)}/{MODULES.length}
                     </td>
                     <td className="px-4 py-3.5">
                       <EngagementBadge level={level} />

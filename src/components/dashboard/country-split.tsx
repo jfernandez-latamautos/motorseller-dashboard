@@ -26,9 +26,9 @@ export function CountrySplit({ dealers }: { dealers: Dealer[] }) {
   ];
 
   return (
-    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[var(--shadow-sm)] md:p-5">
-      <h2 className="text-base font-bold text-[var(--ink)]">Por país</h2>
-      <p className="mb-3 text-sm text-[var(--muted)]">
+    <div className="rounded-[var(--radius)] border border-[var(--border)] bg-[var(--surface)] p-3.5 shadow-[var(--shadow-sm)] md:p-4">
+      <h2 className="text-sm font-bold text-[var(--ink)]">Por país</h2>
+      <p className="mb-2.5 text-xs text-[var(--muted)]">
         Agencias e inventario publicado
       </p>
 

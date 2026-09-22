@@ -4,7 +4,16 @@ import type {
   EngagementLevel,
   ModuleKey,
 } from "./types";
-import { MODULES } from "./mock-data";
+import { MODULES, PERIOD_GROWTH } from "./mock-data";
+
+/** Módulos prioritarios para demos / growth */
+export const PRIORITY_MODULES: ModuleKey[] = [
+  "perfilador",
+  "prospectos",
+  "estadisticas",
+  "leads",
+];
+
 
 /** Los mocks están en base 30 días; se proyectan al rango del filtro */
 const BASELINE_DAYS = 30;
@@ -39,6 +48,29 @@ export function lowActivityThreshold(
   return Math.max(3, Math.round(20 * rangeFactor(rangeDays)));
 }
 
+/** Umbral para “top uso” del módulo (acciones en el periodo) */
+export function topActivityThreshold(
+  rangeDays: DashboardFilters["rangeDays"]
+): number {
+  return Math.max(15, Math.round(60 * rangeFactor(rangeDays)));
+}
+
+export type ModuleUsageBand = "none" | "low" | "moderate" | "top";
+
+export function moduleUsageBand(
+  adopted: boolean,
+  actions: number,
+  rangeDays: DashboardFilters["rangeDays"]
+): ModuleUsageBand {
+  if (!adopted || actions <= 0) return "none";
+  const low = lowActivityThreshold(rangeDays);
+  const top = topActivityThreshold(rangeDays);
+  if (actions < low) return "low";
+  if (actions < top) return "moderate";
+  return "top";
+}
+
+
 export function filterDealers(
   dealers: Dealer[],
   filters: DashboardFilters
@@ -59,6 +91,7 @@ export function filterDealers(
         const q = filters.search.toLowerCase();
         const haystack = [
           dealer.name,
+          dealer.id,
           dealer.agencyCode,
           dealer.city,
           dealer.marketplace,
@@ -182,4 +215,117 @@ export function computeKpis(dealers: Dealer[], allDealers: Dealer[]) {
     avgModules: Math.round(avgModules * 10) / 10,
     panelShare,
   };
+}
+
+export function formatDeltaPercent(fraction: number): string {
+  const pct = Math.round(fraction * 100);
+  if (pct === 0) return "0%";
+  return pct > 0 ? `+${pct}%` : `${pct}%`;
+}
+
+export function formatDeltaPoints(points: number): string {
+  if (points === 0) return "0 pp";
+  return points > 0 ? `+${points} pp` : `${points} pp`;
+}
+
+/** KPIs del periodo + variación vs periodo anterior (mock growth) */
+export function computeKpisWithGrowth(
+  dealers: Dealer[],
+  allDealers: Dealer[]
+) {
+  const kpis = computeKpis(dealers, allDealers);
+  const g = PERIOD_GROWTH;
+  return {
+    ...kpis,
+    growth: {
+      leads: g.leads,
+      sessions: g.sessions,
+      inventory: g.inventory,
+      activeDealers: g.activeDealers,
+    },
+  };
+}
+
+export function moduleAdoptionWithGrowth(dealers: Dealer[]) {
+  return MODULES.map((mod) => {
+    const rate = moduleAdoptionRate(dealers, mod.key);
+    const deltaPp = PERIOD_GROWTH.modules[mod.key] ?? 0;
+    return {
+      mod,
+      rate,
+      deltaPp,
+      previousRate: Math.max(0, Math.min(100, rate - deltaPp)),
+    };
+  });
+}
+
+export type OutreachKind = "demo" | "interview";
+
+export type OutreachCandidate = {
+  dealer: Dealer;
+  kind: OutreachKind;
+  reason: string;
+  missing: { key: ModuleKey; name: string }[];
+  score: number;
+};
+
+/**
+ * Cola PM: champions (entrevista) o activos con gaps en módulos clave (demo).
+ * Criterio amplio para el prototipo (incluye medium/low con gaps).
+ */
+export function outreachCandidates(dealers: Dealer[]): OutreachCandidate[] {
+  const panel = dealers.filter((d) => d.accessType === "panel");
+  const nameByKey = Object.fromEntries(
+    MODULES.map((m) => [m.key, m.name])
+  ) as Record<ModuleKey, string>;
+
+  const rows: OutreachCandidate[] = [];
+
+  for (const dealer of panel) {
+    const level = engagementLevel(dealer);
+    const score = engagementScore(dealer);
+    const missing = PRIORITY_MODULES.filter(
+      (key) => !dealer.modules.some((m) => m.module === key && m.adopted)
+    ).map((key) => ({ key, name: nameByKey[key] }));
+
+    if (level === "dormant") continue;
+
+    if (level === "high" && missing.length <= 1) {
+      rows.push({
+        dealer,
+        kind: "interview",
+        reason: "Champion · alto uso del panel",
+        missing,
+        score,
+      });
+      continue;
+    }
+
+    if (missing.length > 0) {
+      const topGap = missing[0];
+      rows.push({
+        dealer,
+        kind: "demo",
+        reason:
+          level === "low"
+            ? `Reactivar · no usa ${topGap.name}`
+            : `Demo · no usa ${topGap.name}`,
+        missing,
+        score,
+      });
+    } else if (level === "high" || level === "medium") {
+      rows.push({
+        dealer,
+        kind: "interview",
+        reason: "Champion · buen uso de módulos clave",
+        missing,
+        score,
+      });
+    }
+  }
+
+  return rows.sort((a, b) => {
+    if (a.kind !== b.kind) return a.kind === "demo" ? -1 : 1;
+    return b.score - a.score;
+  });
 }

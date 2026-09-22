@@ -16,27 +16,29 @@ export function DealersPage() {
       `motorseller-agencias-${filters.rangeDays}d.csv`,
       [
         "Agencia",
-        "Código",
+        "ID",
         "País",
         "Ciudad",
         "Acceso",
+        "Ejecutivo cuenta",
+        "Alta LAA",
         "Inventario",
         "Leads",
         "Web",
         "Móvil",
-        "AM",
       ],
       filteredDealers.map((d) => [
         d.name,
-        d.agencyCode,
+        d.id,
         d.country,
         d.city,
         d.accessType === "panel" ? "Panel" : "CRM only",
+        d.accountManager,
+        d.createdAt,
         d.inventoryPublished,
         d.leads30d,
         d.webSessions30d,
         d.mobileSessions30d,
-        d.accountManager,
       ])
     );
   };
