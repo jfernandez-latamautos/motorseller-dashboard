@@ -9,6 +9,7 @@ import { CountrySplit } from "@/components/dashboard/country-split";
 import { DefinitionsButton } from "@/components/dashboard/definitions-banner";
 import { OutreachQueue } from "@/components/dashboard/outreach-queue";
 import { ModuleGrowthList } from "@/components/dashboard/growth-strip";
+import { ExecutiveCapture } from "@/components/dashboard/executive-capture";
 import {
   computeKpisWithGrowth,
   formatDeltaPercent,
@@ -24,7 +25,8 @@ export function OverviewDashboard() {
       <TopFilters
         title="Resumen"
         subtitle="Vista rápida del panel"
-        trailing={<DefinitionsButton />}
+        trailing={() => <DefinitionsButton />}
+        hideFilters={["platform"]}
       />
 
       <div className="flex flex-col gap-3 p-4 md:gap-4 md:p-5">
@@ -74,8 +76,13 @@ export function OverviewDashboard() {
           </div>
         </section>
 
+        <ExecutiveCapture />
+
         <section className="grid gap-3 lg:grid-cols-2">
-          <ModuleGrowthList dealers={filteredDealers} />
+          <ModuleGrowthList
+            dealers={filteredDealers}
+            rangeDays={filters.rangeDays}
+          />
           <OutreachQueue dealers={filteredDealers} />
         </section>
       </div>

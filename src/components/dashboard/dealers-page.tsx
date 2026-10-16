@@ -48,7 +48,7 @@ export function DealersPage() {
       <TopFilters
         title="Agencias"
         subtitle={`${filters.rangeDays} días`}
-        trailing={
+        trailing={() => (
           <button
             type="button"
             onClick={exportDealers}
@@ -57,7 +57,7 @@ export function DealersPage() {
             <Download className="h-3.5 w-3.5" />
             <span className="hidden sm:inline">CSV</span>
           </button>
-        }
+        )}
       />
       <div className="flex flex-1 flex-col gap-4 p-4 md:gap-5 md:p-6">
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">

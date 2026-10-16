@@ -61,8 +61,14 @@ export function GrowthStrip({
   );
 }
 
-export function ModuleGrowthList({ dealers }: { dealers: Dealer[] }) {
-  const rows = moduleAdoptionWithGrowth(dealers).sort(
+export function ModuleGrowthList({
+  dealers,
+  rangeDays = 30,
+}: {
+  dealers: Dealer[];
+  rangeDays?: 7 | 30 | 90;
+}) {
+  const rows = moduleAdoptionWithGrowth(dealers, rangeDays).sort(
     (a, b) => a.rate - b.rate
   );
 

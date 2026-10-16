@@ -2,13 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, Boxes } from "lucide-react";
+import {
+  LayoutDashboard,
+  Building2,
+  Boxes,
+  Settings2,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const TABS = [
   { href: "/", label: "Resumen", icon: LayoutDashboard },
   { href: "/modules", label: "Módulos", icon: Boxes },
   { href: "/dealers", label: "Agencias", icon: Building2 },
+  { href: "/config", label: "Config", icon: Settings2 },
 ];
 
 export function BottomNav() {
@@ -19,7 +25,7 @@ export function BottomNav() {
       className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Navegación principal"
     >
-      <ul className="grid h-16 grid-cols-3">
+      <ul className="grid h-16 grid-cols-4">
         {TABS.map((tab) => {
           const active =
             tab.href === "/"

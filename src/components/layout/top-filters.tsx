@@ -2,17 +2,24 @@
 
 import { FilterSheet, DesktopFilters } from "@/components/layout/filter-sheet";
 import { useFilters } from "@/components/filters/filter-context";
+import type { FilterKey } from "@/lib/types";
 
 export function TopFilters({
   title,
   subtitle,
   trailing,
+  hideFilters,
 }: {
   title: string;
   subtitle?: string;
-  trailing?: React.ReactNode;
+  /** Render prop: evita montar el mismo nodo dos veces (móvil + desktop) */
+  trailing?: React.ReactNode | (() => React.ReactNode);
+  /** Filtros a ocultar en este reporte (siguen en estado global si vienen de otra vista) */
+  hideFilters?: FilterKey[];
 }) {
   const { filters, filteredDealers } = useFilters();
+  const trail = () =>
+    typeof trailing === "function" ? trailing() : trailing;
 
   return (
     <header className="sticky top-0 z-20 border-b border-[var(--border)] bg-[var(--surface)]/95 backdrop-blur-md">
@@ -37,8 +44,8 @@ export function TopFilters({
             {subtitle ? ` · ${subtitle}` : ""}
           </p>
         </div>
-        <FilterSheet />
-        {trailing}
+        <FilterSheet hide={hideFilters} />
+        {trail()}
       </div>
 
       {/* Desktop */}
@@ -47,13 +54,14 @@ export function TopFilters({
           <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)]">
             {title}
           </h1>
-          {subtitle ? (
-            <p className="mt-1 text-sm text-[var(--muted)]">{subtitle}</p>
-          ) : null}
+          <p className="mt-1 text-sm text-[var(--muted)]">
+            {filteredDealers.length} agencias · {filters.rangeDays}d
+            {subtitle ? ` · ${subtitle}` : ""}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <DesktopFilters />
-          {trailing}
+          <DesktopFilters hide={hideFilters} />
+          {trail()}
         </div>
       </div>
     </header>

@@ -16,6 +16,7 @@ const defaultFilters: DashboardFilters = {
   accessType: "panel_preferred",
   platform: "all",
   rangeDays: 30,
+  accountManager: "all",
   search: "",
 };
 

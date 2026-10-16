@@ -80,5 +80,8 @@ export interface DashboardFilters {
   accessType: AccessType | "panel_preferred" | "all";
   platform: Platform | "all";
   rangeDays: 7 | 30 | 90;
+  accountManager: string | "all";
   search: string;
 }
+
+export type FilterKey = keyof DashboardFilters;

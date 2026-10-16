@@ -107,7 +107,15 @@ function ModulesExplorer({
 
   useEffect(() => {
     setPage(1);
-  }, [segment, sortDir, filters.search, filters.country, filters.accessType, filters.platform, filters.rangeDays]);
+  }, [
+    segment,
+    sortDir,
+    filters.search,
+    filters.country,
+    filters.accessType,
+    filters.rangeDays,
+    filters.accountManager,
+  ]);
 
   useEffect(() => {
     if (segment === "top" || segment === "moderate") setSortDir("desc");
@@ -123,15 +131,19 @@ function ModulesExplorer({
 
   const summary = useMemo(() => {
     return MODULES.map((mod) => {
-      const usages = panel.map((d) => ({
-        dealer: d,
-        usage: moduleUsage(d, mod.key),
-        band: moduleUsageBand(
-          moduleUsage(d, mod.key).adopted,
-          moduleUsage(d, mod.key).actions30d,
-          filters.rangeDays
-        ),
-      }));
+      const usages = panel.map((d) => {
+        const usage = moduleUsage(d, mod.key);
+        return {
+          dealer: d,
+          usage,
+          band: moduleUsageBand(
+            usage.adopted,
+            usage.actions30d,
+            filters.rangeDays,
+            usage.lastUsedAt
+          ),
+        };
+      });
       const counts = {
         none: usages.filter((u) => u.band === "none").length,
         low: usages.filter((u) => u.band === "low").length,
@@ -140,7 +152,11 @@ function ModulesExplorer({
       };
       return {
         mod,
-        rate: moduleAdoptionRate(filteredDealers, mod.key),
+        rate: moduleAdoptionRate(
+          filteredDealers,
+          mod.key,
+          filters.rangeDays
+        ),
         notAdoptedCount: counts.none,
         counts,
       };
@@ -154,9 +170,10 @@ function ModulesExplorer({
     ? (summary.find((s) => s.mod.key === selectedKey) ?? null)
     : null;
   const selectedGrowth = selectedKey
-    ? (moduleAdoptionWithGrowth(filteredDealers).find(
-        (r) => r.mod.key === selectedKey
-      ) ?? null)
+    ? (moduleAdoptionWithGrowth(
+        filteredDealers,
+        filters.rangeDays
+      ).find((r) => r.mod.key === selectedKey) ?? null)
     : null;
 
   const agencyRows = useMemo(() => {
@@ -169,7 +186,8 @@ function ModulesExplorer({
         band: moduleUsageBand(
           usage.adopted,
           usage.actions30d,
-          filters.rangeDays
+          filters.rangeDays,
+          usage.lastUsedAt
         ),
       };
     });
@@ -248,7 +266,8 @@ function ModulesExplorer({
             ? `${formatPercent(selectedStats?.rate ?? 0)} adopción`
             : "Elige un módulo"
         }
-        trailing={
+        hideFilters={["platform"]}
+        trailing={() =>
           selected ? (
             <a
               href="/modules"

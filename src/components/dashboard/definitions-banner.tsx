@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { Info, X } from "lucide-react";
 
+/** Solo términos del README v1 */
 const DEFS = [
   {
     term: "Adopción",
@@ -15,19 +16,11 @@ const DEFS = [
   },
   {
     term: "Sesión",
-    text: "Visita al panel (web o app). Filtro Web / Móvil.",
+    text: "Visita al panel (web o app). Filtro de plataforma Web / Móvil.",
   },
   {
-    term: "Ejecutivo (AM)",
-    text: "Account Manager de LatamAutos a cargo de la agencia.",
-  },
-  {
-    term: "Demo / entrevista",
-    text: "Demo = gap en módulo clave. Entrevista = champion.",
-  },
-  {
-    term: "Growth",
-    text: "Variación vs el periodo anterior de igual duración.",
+    term: "CRM only",
+    text: "Agencia contratada sin acceso al panel Motor Seller (solo CRM).",
   },
 ];
 
@@ -56,7 +49,7 @@ export function DefinitionsButton() {
   const dialog =
     open && mounted
       ? createPortal(
-          <div className="fixed inset-0 z-[100]">
+          <div className="fixed inset-0 z-[200] flex items-end justify-center md:items-center md:p-4">
             <button
               type="button"
               className="absolute inset-0 bg-black/40"
@@ -64,16 +57,24 @@ export function DefinitionsButton() {
               onClick={() => setOpen(false)}
             />
 
-            {/* Móvil: bottom sheet nativo */}
-            <div className="absolute inset-x-0 bottom-0 max-h-[88vh] overflow-y-auto rounded-t-3xl bg-[var(--surface)] pb-[env(safe-area-inset-bottom)] shadow-[var(--shadow-md)] md:hidden">
-              <div className="sticky top-0 z-10 flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="defs-title"
+              className="relative z-10 flex max-h-[88vh] w-full max-w-lg flex-col rounded-t-3xl bg-[var(--surface)] shadow-[var(--shadow-md)] md:max-h-[85vh] md:rounded-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] px-4 py-3 md:px-6 md:py-4">
                 <div className="flex items-center gap-2">
                   <Info className="h-4 w-4 text-[var(--accent)]" />
                   <div>
-                    <p className="text-base font-bold text-[var(--ink)]">
+                    <h2
+                      id="defs-title"
+                      className="text-base font-bold text-[var(--ink)]"
+                    >
                       Definiciones
-                    </p>
-                    <p className="text-xs text-[var(--muted)]">v1</p>
+                    </h2>
+                    <p className="text-xs text-[var(--muted)] md:hidden">v1</p>
                   </div>
                 </div>
                 <button
@@ -85,53 +86,14 @@ export function DefinitionsButton() {
                   <X className="h-5 w-5" />
                 </button>
               </div>
-              <dl className="flex flex-col gap-4 p-4">
-                {DEFS.map((d) => (
-                  <div key={d.term}>
-                    <dt className="text-sm font-bold text-[var(--ink)]">
-                      {d.term}
-                    </dt>
-                    <dd className="mt-0.5 text-sm leading-relaxed text-[var(--muted)]">
-                      {d.text}
-                    </dd>
-                  </div>
-                ))}
-              </dl>
-            </div>
 
-            {/* Desktop: modal centrado */}
-            <div
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="defs-title"
-              className="absolute top-1/2 left-1/2 hidden w-full max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-[var(--surface)] p-6 shadow-[var(--shadow-md)] md:block"
-            >
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Info className="h-4 w-4 text-[var(--accent)]" />
-                  <h2
-                    id="defs-title"
-                    className="text-base font-bold text-[var(--ink)]"
-                  >
-                    Definiciones
-                  </h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setOpen(false)}
-                  aria-label="Cerrar"
-                  className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-[var(--bg)]"
-                >
-                  <X className="h-4 w-4 text-[var(--muted)]" />
-                </button>
-              </div>
-              <dl className="grid gap-4 sm:grid-cols-2">
+              <dl className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pb-[max(1rem,env(safe-area-inset-bottom))] md:grid md:grid-cols-2 md:gap-4 md:p-6">
                 {DEFS.map((d) => (
-                  <div key={d.term}>
-                    <dt className="text-xs font-bold text-[var(--ink)]">
+                  <div key={d.term} className="mb-4 last:mb-0 md:mb-0">
+                    <dt className="text-sm font-bold text-[var(--ink)] md:text-xs">
                       {d.term}
                     </dt>
-                    <dd className="mt-0.5 text-xs leading-relaxed text-[var(--muted)]">
+                    <dd className="mt-0.5 text-sm leading-relaxed text-[var(--muted)] md:text-xs">
                       {d.text}
                     </dd>
                   </div>
@@ -147,8 +109,12 @@ export function DefinitionsButton() {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
-        className="inline-flex h-9 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--ink)] md:h-9"
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
+        className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--ink)]"
       >
         <Info className="h-3.5 w-3.5" />
         Definiciones

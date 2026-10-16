@@ -4,13 +4,23 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { SlidersHorizontal, X, RotateCcw } from "lucide-react";
 import { useFilters } from "@/components/filters/filter-context";
+import { listAccountManagers } from "@/lib/metrics";
 import { cn } from "@/lib/utils";
+import type { FilterKey } from "@/lib/types";
 
 const field =
   "w-full rounded-xl border border-[var(--border)] bg-[var(--bg)] px-3 py-3 text-sm text-[var(--ink)] outline-none focus:border-[var(--accent)]";
 
-export function FilterSheet() {
-  const { filters, setFilters, resetFilters, filteredDealers } = useFilters();
+function useVisible(hide?: FilterKey[]) {
+  const hidden = new Set(hide ?? []);
+  return (key: FilterKey) => !hidden.has(key);
+}
+
+export function FilterSheet({ hide }: { hide?: FilterKey[] }) {
+  const { filters, setFilters, resetFilters, filteredDealers, dealers } =
+    useFilters();
+  const executives = listAccountManagers(dealers);
+  const show = useVisible(hide);
   const [open, setOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
 
@@ -33,11 +43,12 @@ export function FilterSheet() {
   }, [open]);
 
   const activeCount = [
-    filters.country !== "all",
-    filters.accessType !== "panel_preferred",
-    filters.platform !== "all",
-    filters.rangeDays !== 30,
-    Boolean(filters.search.trim()),
+    show("country") && filters.country !== "all",
+    show("accessType") && filters.accessType !== "panel_preferred",
+    show("platform") && filters.platform !== "all",
+    show("rangeDays") && filters.rangeDays !== 30,
+    show("accountManager") && filters.accountManager !== "all",
+    show("search") && Boolean(filters.search.trim()),
   ].filter(Boolean).length;
 
   const sheet =
@@ -72,97 +83,132 @@ export function FilterSheet() {
 
               <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 <div className="flex flex-col gap-4 p-4">
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                      Buscar
-                    </span>
-                    <input
-                      value={filters.search}
-                      onChange={(e) => setFilters({ search: e.target.value })}
-                      placeholder="Nombre o ID de agencia"
-                      className={field}
-                    />
-                  </label>
+                  {show("search") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        Buscar
+                      </span>
+                      <input
+                        value={filters.search}
+                        onChange={(e) =>
+                          setFilters({ search: e.target.value })
+                        }
+                        placeholder="Nombre o ID de agencia"
+                        className={field}
+                      />
+                    </label>
+                  ) : null}
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                      País
-                    </span>
-                    <select
-                      value={filters.country}
-                      onChange={(e) =>
-                        setFilters({
-                          country: e.target.value as typeof filters.country,
-                        })
-                      }
-                      className={field}
-                    >
-                      <option value="all">Todos</option>
-                      <option value="MX">México · Seminuevos</option>
-                      <option value="EC">Ecuador · Patiotuerca</option>
-                    </select>
-                  </label>
+                  {show("country") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        País
+                      </span>
+                      <select
+                        value={filters.country}
+                        onChange={(e) =>
+                          setFilters({
+                            country: e.target.value as typeof filters.country,
+                          })
+                        }
+                        className={field}
+                      >
+                        <option value="all">Todos</option>
+                        <option value="MX">México · Seminuevos</option>
+                        <option value="EC">Ecuador · Patiotuerca</option>
+                      </select>
+                    </label>
+                  ) : null}
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                      Acceso
-                    </span>
-                    <select
-                      value={filters.accessType}
-                      onChange={(e) =>
-                        setFilters({
-                          accessType:
-                            e.target.value as typeof filters.accessType,
-                        })
-                      }
-                      className={field}
-                    >
-                      <option value="panel_preferred">Panel (sin CRM)</option>
-                      <option value="crm_only">Solo CRM</option>
-                      <option value="panel">Solo panel</option>
-                      <option value="all">Panel + CRM</option>
-                    </select>
-                  </label>
+                  {show("accessType") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        Acceso
+                      </span>
+                      <select
+                        value={filters.accessType}
+                        onChange={(e) =>
+                          setFilters({
+                            accessType:
+                              e.target.value as typeof filters.accessType,
+                          })
+                        }
+                        className={field}
+                      >
+                        <option value="panel_preferred">Panel (sin CRM)</option>
+                        <option value="crm_only">Solo CRM</option>
+                        <option value="panel">Solo panel</option>
+                        <option value="all">Panel + CRM</option>
+                      </select>
+                    </label>
+                  ) : null}
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                      Plataforma
-                    </span>
-                    <select
-                      value={filters.platform}
-                      onChange={(e) =>
-                        setFilters({
-                          platform: e.target.value as typeof filters.platform,
-                        })
-                      }
-                      className={field}
-                    >
-                      <option value="all">Web + Móvil</option>
-                      <option value="web">Solo web</option>
-                      <option value="mobile">Solo móvil</option>
-                    </select>
-                  </label>
+                  {show("accountManager") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        Ejecutivo
+                      </span>
+                      <select
+                        value={filters.accountManager}
+                        onChange={(e) =>
+                          setFilters({ accountManager: e.target.value })
+                        }
+                        className={field}
+                      >
+                        <option value="all">Todos los ejecutivos</option>
+                        {executives.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  ) : null}
 
-                  <label className="block">
-                    <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
-                      Periodo
-                    </span>
-                    <select
-                      value={filters.rangeDays}
-                      onChange={(e) =>
-                        setFilters({
-                          rangeDays: Number(
-                            e.target.value
-                          ) as typeof filters.rangeDays,
-                        })
-                      }
-                      className={field}
-                    >
-                      <option value={7}>Últimos 7 días</option>
-                      <option value={30}>Últimos 30 días</option>
-                      <option value={90}>Últimos 90 días</option>
-                    </select>
-                  </label>
+                  {show("platform") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        Plataforma
+                      </span>
+                      <select
+                        value={filters.platform}
+                        onChange={(e) =>
+                          setFilters({
+                            platform:
+                              e.target.value as typeof filters.platform,
+                          })
+                        }
+                        className={field}
+                      >
+                        <option value="all">Web + Móvil</option>
+                        <option value="web">Solo web</option>
+                        <option value="mobile">Solo móvil</option>
+                      </select>
+                    </label>
+                  ) : null}
+
+                  {show("rangeDays") ? (
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs font-semibold text-[var(--muted)]">
+                        Periodo
+                      </span>
+                      <select
+                        value={filters.rangeDays}
+                        onChange={(e) =>
+                          setFilters({
+                            rangeDays: Number(
+                              e.target.value
+                            ) as typeof filters.rangeDays,
+                          })
+                        }
+                        className={field}
+                      >
+                        <option value={7}>Últimos 7 días</option>
+                        <option value={30}>Últimos 30 días</option>
+                        <option value={90}>Últimos 90 días</option>
+                      </select>
+                    </label>
+                  ) : null}
                 </div>
               </div>
 
@@ -210,68 +256,95 @@ export function FilterSheet() {
 }
 
 /** Filtros inline para desktop */
-export function DesktopFilters() {
-  const { filters, setFilters, resetFilters, filteredDealers } = useFilters();
+export function DesktopFilters({ hide }: { hide?: FilterKey[] }) {
+  const { filters, setFilters, resetFilters, filteredDealers, dealers } =
+    useFilters();
+  const executives = listAccountManagers(dealers);
+  const show = useVisible(hide);
   const chip =
     "rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs text-[var(--ink)] outline-none focus:border-[var(--accent)]";
 
   return (
     <div className="hidden flex-wrap items-center gap-2 md:flex">
-      <input
-        value={filters.search}
-        onChange={(e) => setFilters({ search: e.target.value })}
-        placeholder="Buscar agencia..."
-        className={cn(chip, "w-48")}
-      />
-      <select
-        value={filters.country}
-        onChange={(e) =>
-          setFilters({ country: e.target.value as typeof filters.country })
-        }
-        className={chip}
-      >
-        <option value="all">Todos los países</option>
-        <option value="MX">México · Seminuevos</option>
-        <option value="EC">Ecuador · Patiotuerca</option>
-      </select>
-      <select
-        value={filters.accessType}
-        onChange={(e) =>
-          setFilters({
-            accessType: e.target.value as typeof filters.accessType,
-          })
-        }
-        className={chip}
-      >
-        <option value="panel_preferred">Panel (sin CRM)</option>
-        <option value="crm_only">Solo CRM</option>
-        <option value="panel">Solo panel</option>
-        <option value="all">Panel + CRM</option>
-      </select>
-      <select
-        value={filters.platform}
-        onChange={(e) =>
-          setFilters({ platform: e.target.value as typeof filters.platform })
-        }
-        className={chip}
-      >
-        <option value="all">Web + Móvil</option>
-        <option value="web">Solo web</option>
-        <option value="mobile">Solo móvil</option>
-      </select>
-      <select
-        value={filters.rangeDays}
-        onChange={(e) =>
-          setFilters({
-            rangeDays: Number(e.target.value) as typeof filters.rangeDays,
-          })
-        }
-        className={chip}
-      >
-        <option value={7}>Últimos 7 días</option>
-        <option value={30}>Últimos 30 días</option>
-        <option value={90}>Últimos 90 días</option>
-      </select>
+      {show("search") ? (
+        <input
+          value={filters.search}
+          onChange={(e) => setFilters({ search: e.target.value })}
+          placeholder="Buscar agencia..."
+          className={cn(chip, "w-48")}
+        />
+      ) : null}
+      {show("country") ? (
+        <select
+          value={filters.country}
+          onChange={(e) =>
+            setFilters({ country: e.target.value as typeof filters.country })
+          }
+          className={chip}
+        >
+          <option value="all">Todos los países</option>
+          <option value="MX">México · Seminuevos</option>
+          <option value="EC">Ecuador · Patiotuerca</option>
+        </select>
+      ) : null}
+      {show("accessType") ? (
+        <select
+          value={filters.accessType}
+          onChange={(e) =>
+            setFilters({
+              accessType: e.target.value as typeof filters.accessType,
+            })
+          }
+          className={chip}
+        >
+          <option value="panel_preferred">Panel (sin CRM)</option>
+          <option value="crm_only">Solo CRM</option>
+          <option value="panel">Solo panel</option>
+          <option value="all">Panel + CRM</option>
+        </select>
+      ) : null}
+      {show("accountManager") ? (
+        <select
+          value={filters.accountManager}
+          onChange={(e) => setFilters({ accountManager: e.target.value })}
+          className={chip}
+        >
+          <option value="all">Todos los ejecutivos</option>
+          {executives.map((name) => (
+            <option key={name} value={name}>
+              {name}
+            </option>
+          ))}
+        </select>
+      ) : null}
+      {show("platform") ? (
+        <select
+          value={filters.platform}
+          onChange={(e) =>
+            setFilters({ platform: e.target.value as typeof filters.platform })
+          }
+          className={chip}
+        >
+          <option value="all">Web + Móvil</option>
+          <option value="web">Solo web</option>
+          <option value="mobile">Solo móvil</option>
+        </select>
+      ) : null}
+      {show("rangeDays") ? (
+        <select
+          value={filters.rangeDays}
+          onChange={(e) =>
+            setFilters({
+              rangeDays: Number(e.target.value) as typeof filters.rangeDays,
+            })
+          }
+          className={chip}
+        >
+          <option value={7}>Últimos 7 días</option>
+          <option value={30}>Últimos 30 días</option>
+          <option value={90}>Últimos 90 días</option>
+        </select>
+      ) : null}
       <button
         type="button"
         onClick={resetFilters}

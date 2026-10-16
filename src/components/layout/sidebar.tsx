@@ -1,8 +1,16 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, Building2, Boxes } from "lucide-react";
+import {
+  LayoutDashboard,
+  Building2,
+  Boxes,
+  Settings2,
+  ChevronDown,
+} from "lucide-react";
+import { CATALOG_SECTIONS } from "@/lib/catalogs";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -13,6 +21,12 @@ const NAV = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const configActive = pathname.startsWith("/config");
+  const [configOpen, setConfigOpen] = useState(configActive);
+
+  useEffect(() => {
+    if (configActive) setConfigOpen(true);
+  }, [configActive]);
 
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--surface)] md:flex">
@@ -53,6 +67,52 @@ export function Sidebar() {
             </Link>
           );
         })}
+
+        <div className="mt-1">
+          <button
+            type="button"
+            onClick={() => setConfigOpen((o) => !o)}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-sm transition-colors",
+              configActive
+                ? "font-semibold text-[var(--accent)]"
+                : "text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+            )}
+            aria-expanded={configOpen}
+          >
+            <Settings2 className="h-4 w-4" />
+            <span className="flex-1 text-left">Configuración</span>
+            <ChevronDown
+              className={cn(
+                "h-4 w-4 transition-transform",
+                configOpen && "rotate-180"
+              )}
+            />
+          </button>
+
+          {configOpen ? (
+            <ul className="mt-0.5 ml-3 flex flex-col gap-0.5 border-l border-[var(--border)] pl-2">
+              {CATALOG_SECTIONS.map((item) => {
+                const active = pathname.startsWith(item.href);
+                return (
+                  <li key={item.key}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        "block rounded-lg px-3 py-2 text-sm transition-colors",
+                        active
+                          ? "bg-[var(--accent-soft)] font-semibold text-[var(--accent)]"
+                          : "text-[var(--muted)] hover:bg-[var(--bg)] hover:text-[var(--ink)]"
+                      )}
+                    >
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
       </nav>
 
       <div className="border-t border-[var(--border)] p-4">

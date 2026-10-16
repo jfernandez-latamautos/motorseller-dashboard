@@ -17,6 +17,8 @@ export const PRIORITY_MODULES: ModuleKey[] = [
 
 /** Los mocks están en base 30 días; se proyectan al rango del filtro */
 const BASELINE_DAYS = 30;
+/** Misma ancla que mock-data / engagementLevel */
+const MOCK_NOW_MS = Date.parse("2026-09-21T12:00:00.000Z");
 
 export function rangeFactor(rangeDays: number): number {
   return rangeDays / BASELINE_DAYS;
@@ -42,17 +44,40 @@ export function withRangeMetrics(
   };
 }
 
+/**
+ * Acciones efectivas en el periodo: si el último uso queda fuera del rango,
+ * cuenta como 0 (así el filtro de periodo sí mueve segmentos de módulos).
+ */
+export function moduleActionsInRange(
+  adopted: boolean,
+  actionsScaled: number,
+  lastUsedAt: string | null,
+  rangeDays: DashboardFilters["rangeDays"]
+): number {
+  if (!adopted || actionsScaled <= 0) return 0;
+  if (!lastUsedAt) return 0;
+  const daysSince =
+    (MOCK_NOW_MS - new Date(lastUsedAt).getTime()) / (1000 * 60 * 60 * 24);
+  if (daysSince > rangeDays) return 0;
+  return actionsScaled;
+}
+
+/** Umbrales por ventana (no proporcionales al scale de mocks → el periodo cambia bandas) */
 export function lowActivityThreshold(
   rangeDays: DashboardFilters["rangeDays"]
 ): number {
-  return Math.max(3, Math.round(20 * rangeFactor(rangeDays)));
+  if (rangeDays <= 7) return 8;
+  if (rangeDays <= 30) return 20;
+  return 35;
 }
 
 /** Umbral para “top uso” del módulo (acciones en el periodo) */
 export function topActivityThreshold(
   rangeDays: DashboardFilters["rangeDays"]
 ): number {
-  return Math.max(15, Math.round(60 * rangeFactor(rangeDays)));
+  if (rangeDays <= 7) return 25;
+  if (rangeDays <= 30) return 60;
+  return 100;
 }
 
 export type ModuleUsageBand = "none" | "low" | "moderate" | "top";
@@ -60,13 +85,20 @@ export type ModuleUsageBand = "none" | "low" | "moderate" | "top";
 export function moduleUsageBand(
   adopted: boolean,
   actions: number,
-  rangeDays: DashboardFilters["rangeDays"]
+  rangeDays: DashboardFilters["rangeDays"],
+  lastUsedAt: string | null = null
 ): ModuleUsageBand {
-  if (!adopted || actions <= 0) return "none";
+  const effective = moduleActionsInRange(
+    adopted,
+    actions,
+    lastUsedAt,
+    rangeDays
+  );
+  if (!adopted || effective <= 0) return "none";
   const low = lowActivityThreshold(rangeDays);
   const top = topActivityThreshold(rangeDays);
-  if (actions < low) return "low";
-  if (actions < top) return "moderate";
+  if (effective < low) return "low";
+  if (effective < top) return "moderate";
   return "top";
 }
 
@@ -85,6 +117,13 @@ export function filterDealers(
         if (dealer.accessType !== "panel") return false;
       } else if (filters.accessType !== "all") {
         if (dealer.accessType !== filters.accessType) return false;
+      }
+
+      if (
+        filters.accountManager !== "all" &&
+        dealer.accountManager !== filters.accountManager
+      ) {
+        return false;
       }
 
       if (filters.search.trim()) {
@@ -159,12 +198,20 @@ export function engagementLevel(dealer: Dealer): EngagementLevel {
   return "dormant";
 }
 
-export function moduleAdoptionRate(dealers: Dealer[], module: ModuleKey): number {
+export function moduleAdoptionRate(
+  dealers: Dealer[],
+  module: ModuleKey,
+  rangeDays: DashboardFilters["rangeDays"] = 30
+): number {
   const panel = dealers.filter((d) => d.accessType === "panel");
   if (panel.length === 0) return 0;
-  const adopted = panel.filter((d) =>
-    d.modules.some((m) => m.module === module && m.adopted)
-  ).length;
+  const adopted = panel.filter((d) => {
+    const m = d.modules.find((x) => x.module === module);
+    if (!m) return false;
+    return (
+      moduleActionsInRange(m.adopted, m.actions30d, m.lastUsedAt, rangeDays) > 0
+    );
+  }).length;
   return Math.round((adopted / panel.length) * 100);
 }
 
@@ -228,28 +275,79 @@ export function formatDeltaPoints(points: number): string {
   return points > 0 ? `+${points} pp` : `${points} pp`;
 }
 
-/** KPIs del periodo + variación vs periodo anterior (mock growth) */
+/** Growth base por país — al filtrar, los %+ dejan de verse “pegados” */
+const GROWTH_BY_COUNTRY = {
+  MX: {
+    leads: 0.14,
+    sessions: 0.1,
+    inventory: 0.05,
+    activeDealers: 0.08,
+  },
+  EC: {
+    leads: 0.05,
+    sessions: 0.03,
+    inventory: 0.01,
+    activeDealers: 0.02,
+  },
+} as const;
+
+const MODULE_GROWTH_EC: Partial<Record<ModuleKey, number>> = {
+  perfilador: 2,
+  prospectos: 1,
+  estadisticas: 1,
+  leads: 2,
+  contactos: 3,
+  configuracion: 1,
+  vehiculos: 0,
+  facturacion: 0,
+};
+
+function blendGrowth(
+  dealers: Dealer[],
+  key: keyof typeof GROWTH_BY_COUNTRY.MX
+): number {
+  const panel = dealers.filter((d) => d.accessType === "panel");
+  if (panel.length === 0) return PERIOD_GROWTH[key];
+  const mx = panel.filter((d) => d.country === "MX").length;
+  const ec = panel.length - mx;
+  return (
+    (mx * GROWTH_BY_COUNTRY.MX[key] + ec * GROWTH_BY_COUNTRY.EC[key]) /
+    panel.length
+  );
+}
+
+/** KPIs del periodo + variación vs periodo anterior (según cohorte filtrada) */
 export function computeKpisWithGrowth(
   dealers: Dealer[],
   allDealers: Dealer[]
 ) {
   const kpis = computeKpis(dealers, allDealers);
-  const g = PERIOD_GROWTH;
   return {
     ...kpis,
     growth: {
-      leads: g.leads,
-      sessions: g.sessions,
-      inventory: g.inventory,
-      activeDealers: g.activeDealers,
+      leads: blendGrowth(dealers, "leads"),
+      sessions: blendGrowth(dealers, "sessions"),
+      inventory: blendGrowth(dealers, "inventory"),
+      activeDealers: blendGrowth(dealers, "activeDealers"),
     },
   };
 }
 
-export function moduleAdoptionWithGrowth(dealers: Dealer[]) {
+export function moduleAdoptionWithGrowth(
+  dealers: Dealer[],
+  rangeDays: DashboardFilters["rangeDays"] = 30
+) {
+  const panel = dealers.filter((d) => d.accessType === "panel");
+  const mxShare =
+    panel.length === 0
+      ? 0.5
+      : panel.filter((d) => d.country === "MX").length / panel.length;
+
   return MODULES.map((mod) => {
-    const rate = moduleAdoptionRate(dealers, mod.key);
-    const deltaPp = PERIOD_GROWTH.modules[mod.key] ?? 0;
+    const rate = moduleAdoptionRate(dealers, mod.key, rangeDays);
+    const mxDelta = PERIOD_GROWTH.modules[mod.key] ?? 0;
+    const ecDelta = MODULE_GROWTH_EC[mod.key] ?? mxDelta;
+    const deltaPp = Math.round(mxShare * mxDelta + (1 - mxShare) * ecDelta);
     return {
       mod,
       rate,
@@ -257,6 +355,73 @@ export function moduleAdoptionWithGrowth(dealers: Dealer[]) {
       previousRate: Math.max(0, Math.min(100, rate - deltaPp)),
     };
   });
+}
+
+export function listAccountManagers(dealers: Dealer[]): string[] {
+  return [...new Set(dealers.map((d) => d.accountManager))].sort((a, b) =>
+    a.localeCompare(b, "es")
+  );
+}
+
+/**
+ * Captación por ejecutivo: agencias, leads y % adopción de módulos prioritarios.
+ */
+export function executiveCapture(
+  dealers: Dealer[],
+  rangeDays: DashboardFilters["rangeDays"] = 30
+) {
+  const byAm = new Map<string, Dealer[]>();
+  for (const d of dealers) {
+    const list = byAm.get(d.accountManager) ?? [];
+    list.push(d);
+    byAm.set(d.accountManager, list);
+  }
+
+  return [...byAm.entries()]
+    .map(([name, list]) => {
+      const panel = list.filter((d) => d.accessType === "panel");
+      const leads = panel.reduce((s, d) => s + d.leads30d, 0);
+      const priorityAdoption =
+        panel.length === 0
+          ? 0
+          : Math.round(
+              PRIORITY_MODULES.reduce(
+                (sum, key) =>
+                  sum + moduleAdoptionRate(panel, key, rangeDays),
+                0
+              ) / PRIORITY_MODULES.length
+            );
+      const adoptedAnyPriority =
+        panel.length === 0
+          ? 0
+          : Math.round(
+              (panel.filter((d) =>
+                PRIORITY_MODULES.some((key) => {
+                  const m = d.modules.find((x) => x.module === key);
+                  if (!m) return false;
+                  return (
+                    moduleActionsInRange(
+                      m.adopted,
+                      m.actions30d,
+                      m.lastUsedAt,
+                      rangeDays
+                    ) > 0
+                  );
+                })
+              ).length /
+                panel.length) *
+                100
+            );
+
+      return {
+        name,
+        agencies: panel.length,
+        leads,
+        priorityAdoption,
+        adoptedAnyPriority,
+      };
+    })
+    .sort((a, b) => a.priorityAdoption - b.priorityAdoption);
 }
 
 export type OutreachKind = "demo" | "interview";
