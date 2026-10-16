@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Download } from "lucide-react";
 import {
   formatNumber,
@@ -9,11 +10,20 @@ import {
 import { downloadCsv } from "@/lib/export-csv";
 import type { Dealer } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useCatalogs } from "@/components/config/catalog-context";
 
 const VISIBLE = 15;
 
 export function OutreachQueue({ dealers }: { dealers: Dealer[] }) {
-  const all = outreachCandidates(dealers);
+  const { state: catalogs } = useCatalogs();
+  const all = useMemo(
+    () =>
+      outreachCandidates(dealers, {
+        thresholds: catalogs.activityThresholds,
+        weights: catalogs.scoringWeights,
+      }),
+    [dealers, catalogs.activityThresholds, catalogs.scoringWeights]
+  );
   const visible = all.slice(0, VISIBLE);
   const demos = all.filter((c) => c.kind === "demo").length;
   const interviews = all.filter((c) => c.kind === "interview").length;

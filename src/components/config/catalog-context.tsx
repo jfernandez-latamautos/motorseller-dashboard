@@ -12,9 +12,11 @@ import {
 import {
   CATALOG_STORAGE_KEY,
   defaultCatalogState,
+  type ActivityThresholds,
   type CatalogState,
   type DefinitionCatalogItem,
   type ModuleCatalogItem,
+  type ScoringWeights,
 } from "@/lib/catalogs";
 
 type CatalogContextValue = {
@@ -25,6 +27,8 @@ type CatalogContextValue = {
   removeModulo: (id: string) => void;
   upsertDefinicion: (item: DefinitionCatalogItem) => void;
   removeDefinicion: (id: string) => void;
+  setScoringWeights: (weights: ScoringWeights) => void;
+  setActivityThresholds: (thresholds: ActivityThresholds) => void;
 };
 
 const CatalogContext = createContext<CatalogContextValue | null>(null);
@@ -39,6 +43,9 @@ function loadState(): CatalogState {
     return {
       modulos: parsed.modulos ?? base.modulos,
       definiciones: parsed.definiciones ?? base.definiciones,
+      scoringWeights: parsed.scoringWeights ?? base.scoringWeights,
+      activityThresholds:
+        parsed.activityThresholds ?? base.activityThresholds,
     };
   } catch {
     return defaultCatalogState();
@@ -104,6 +111,10 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
         }),
       removeDefinicion: (id) =>
         patch("definiciones", (rows) => rows.filter((r) => r.id !== id)),
+      setScoringWeights: (weights) =>
+        setState((prev) => ({ ...prev, scoringWeights: weights })),
+      setActivityThresholds: (thresholds) =>
+        setState((prev) => ({ ...prev, activityThresholds: thresholds })),
     }),
     [ready, state, resetAll, patch]
   );

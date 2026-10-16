@@ -17,6 +17,7 @@ import {
 import { RelativeTime } from "@/components/ui/relative-time";
 import { Paginator } from "@/components/ui/paginator";
 import { formatDate } from "@/lib/utils";
+import { useCatalogs } from "@/components/config/catalog-context";
 
 const PAGE_SIZE = 10;
 
@@ -29,6 +30,9 @@ export function DealerTable({
   platform: DashboardFilters["platform"];
   compact?: boolean;
 }) {
+  const { state: catalogs } = useCatalogs();
+  const thresholds = catalogs.activityThresholds;
+  const weights = catalogs.scoringWeights;
   const [page, setPage] = useState(1);
 
   const rows = useMemo(
@@ -73,7 +77,9 @@ export function DealerTable({
                     Ejecutivo: {dealer.accountManager}
                   </p>
                 </div>
-                <EngagementBadge level={engagementLevel(dealer)} />
+                <EngagementBadge
+                  level={engagementLevel(dealer, thresholds)}
+                />
               </div>
 
               <div className="mt-3 flex flex-wrap gap-1.5">
@@ -93,7 +99,7 @@ export function DealerTable({
               </div>
 
               <div className="mt-3 flex items-center justify-between text-xs text-[var(--muted)]">
-                <span>Score {engagementScore(dealer)}</span>
+                <span>Score {engagementScore(dealer, weights)}</span>
                 {!compact && dealer.lastLoginAt ? (
                   <RelativeTime date={dealer.lastLoginAt} />
                 ) : null}
@@ -127,7 +133,7 @@ export function DealerTable({
             </thead>
             <tbody>
               {pagedRows.map((dealer) => {
-                const level = engagementLevel(dealer);
+                const level = engagementLevel(dealer, thresholds);
                 const sessions = totalSessions(dealer, platform);
                 return (
                   <tr

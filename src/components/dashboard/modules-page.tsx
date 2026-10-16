@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useFilters } from "@/components/filters/filter-context";
+import { useCatalogs } from "@/components/config/catalog-context";
 import { TopFilters } from "@/components/layout/top-filters";
 import { MODULES } from "@/lib/mock-data";
 import { isModuleKey } from "@/lib/modules";
@@ -90,10 +91,18 @@ function ModulesExplorer({
   initialKey: ModuleKey | null;
 }) {
   const { filteredDealers, filters } = useFilters();
+  const { state: catalogs } = useCatalogs();
   const [selectedKey, setSelectedKey] = useState<ModuleKey | null>(initialKey);
   const [segment, setSegment] = useState<UsageSegment>("none");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
   const [page, setPage] = useState(1);
+
+  const catalogByKey = useMemo(() => {
+    const map = new Map(
+      catalogs.modulos.filter((m) => m.active).map((m) => [m.key, m])
+    );
+    return map;
+  }, [catalogs.modulos]);
 
   useEffect(() => {
     setSelectedKey(initialKey);
@@ -126,11 +135,27 @@ function ModulesExplorer({
     () => filteredDealers.filter((d) => d.accessType === "panel"),
     [filteredDealers]
   );
-  const lowThreshold = lowActivityThreshold(filters.rangeDays);
-  const topThreshold = topActivityThreshold(filters.rangeDays);
+  const selectedCatalog = selectedKey
+    ? (catalogByKey.get(selectedKey) ?? null)
+    : null;
+  const lowThreshold = lowActivityThreshold(
+    filters.rangeDays,
+    selectedCatalog?.lowUsageMax30d ?? 19
+  );
+  const topThreshold = topActivityThreshold(
+    filters.rangeDays,
+    selectedCatalog?.topUsageMin30d ?? 60
+  );
 
   const summary = useMemo(() => {
     return MODULES.map((mod) => {
+      const cat = catalogByKey.get(mod.key);
+      const thresholds = cat
+        ? {
+            lowUsageMax30d: cat.lowUsageMax30d,
+            topUsageMin30d: cat.topUsageMin30d,
+          }
+        : undefined;
       const usages = panel.map((d) => {
         const usage = moduleUsage(d, mod.key);
         return {
@@ -140,7 +165,8 @@ function ModulesExplorer({
             usage.adopted,
             usage.actions30d,
             filters.rangeDays,
-            usage.lastUsedAt
+            usage.lastUsedAt,
+            thresholds
           ),
         };
       });
@@ -161,7 +187,7 @@ function ModulesExplorer({
         counts,
       };
     }).sort((a, b) => a.rate - b.rate);
-  }, [panel, filteredDealers, filters.rangeDays]);
+  }, [panel, filteredDealers, filters.rangeDays, catalogByKey]);
 
   const selected = selectedKey
     ? (MODULES.find((m) => m.key === selectedKey) ?? null)
@@ -178,6 +204,13 @@ function ModulesExplorer({
 
   const agencyRows = useMemo(() => {
     if (!selectedKey) return [];
+    const cat = catalogByKey.get(selectedKey);
+    const thresholds = cat
+      ? {
+          lowUsageMax30d: cat.lowUsageMax30d,
+          topUsageMin30d: cat.topUsageMin30d,
+        }
+      : undefined;
     let rows = panel.map((dealer) => {
       const usage = moduleUsage(dealer, selectedKey);
       return {
@@ -187,7 +220,8 @@ function ModulesExplorer({
           usage.adopted,
           usage.actions30d,
           filters.rangeDays,
-          usage.lastUsedAt
+          usage.lastUsedAt,
+          thresholds
         ),
       };
     });
@@ -199,7 +233,7 @@ function ModulesExplorer({
       return sortDir === "asc" ? diff : -diff;
     });
     return rows;
-  }, [panel, selectedKey, segment, sortDir, filters.rangeDays]);
+  }, [panel, selectedKey, segment, sortDir, filters.rangeDays, catalogByKey]);
 
   const pageCount = Math.max(1, Math.ceil(agencyRows.length / PAGE_SIZE));
   const safePage = Math.min(page, pageCount);
@@ -436,7 +470,12 @@ function ModulesExplorer({
                     </div>
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       <CountryBadge country={dealer.country} />
-                      <EngagementBadge level={engagementLevel(dealer)} />
+                      <EngagementBadge
+                        level={engagementLevel(
+                          dealer,
+                          catalogs.activityThresholds
+                        )}
+                      />
                     </div>
                     <div className="mt-3 grid grid-cols-2 gap-2 text-center">
                       <div className="rounded-xl bg-[var(--bg)] py-2">

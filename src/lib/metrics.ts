@@ -5,15 +5,20 @@ import type {
   ModuleKey,
 } from "./types";
 import { MODULES, PERIOD_GROWTH } from "./mock-data";
+import {
+  SEED_ACTIVITY_THRESHOLDS,
+  SEED_SCORING_WEIGHTS,
+  type ActivityThresholds,
+  type ScoringWeights,
+} from "./catalogs";
 
-/** Módulos prioritarios para demos / growth */
+/** Módulos prioritarios para demos / growth (type = key en catálogo) */
 export const PRIORITY_MODULES: ModuleKey[] = [
   "perfilador",
   "prospectos",
   "estadisticas",
   "leads",
 ];
-
 
 /** Los mocks están en base 30 días; se proyectan al rango del filtro */
 const BASELINE_DAYS = 30;
@@ -62,22 +67,30 @@ export function moduleActionsInRange(
   return actionsScaled;
 }
 
-/** Umbrales por ventana (no proporcionales al scale de mocks → el periodo cambia bandas) */
-export function lowActivityThreshold(
+/**
+ * Escala umbrales de catálogo (base 30d) al periodo filtrado.
+ * lowUsageMax30d / topUsageMin30d del contrato.
+ */
+export function scaleUsageThreshold(
+  base30d: number,
   rangeDays: DashboardFilters["rangeDays"]
 ): number {
-  if (rangeDays <= 7) return 8;
-  if (rangeDays <= 30) return 20;
-  return 35;
+  return Math.max(1, Math.round(base30d * rangeFactor(rangeDays)));
 }
 
-/** Umbral para “top uso” del módulo (acciones en el periodo) */
-export function topActivityThreshold(
-  rangeDays: DashboardFilters["rangeDays"]
+/** Fallback si no hay catálogo (compat) */
+export function lowActivityThreshold(
+  rangeDays: DashboardFilters["rangeDays"],
+  lowUsageMax30d = 19
 ): number {
-  if (rangeDays <= 7) return 25;
-  if (rangeDays <= 30) return 60;
-  return 100;
+  return scaleUsageThreshold(lowUsageMax30d, rangeDays);
+}
+
+export function topActivityThreshold(
+  rangeDays: DashboardFilters["rangeDays"],
+  topUsageMin30d = 60
+): number {
+  return scaleUsageThreshold(topUsageMin30d, rangeDays);
 }
 
 export type ModuleUsageBand = "none" | "low" | "moderate" | "top";
@@ -86,7 +99,8 @@ export function moduleUsageBand(
   adopted: boolean,
   actions: number,
   rangeDays: DashboardFilters["rangeDays"],
-  lastUsedAt: string | null = null
+  lastUsedAt: string | null = null,
+  catalogThresholds?: { lowUsageMax30d: number; topUsageMin30d: number }
 ): ModuleUsageBand {
   const effective = moduleActionsInRange(
     adopted,
@@ -95,11 +109,18 @@ export function moduleUsageBand(
     rangeDays
   );
   if (!adopted || effective <= 0) return "none";
-  const low = lowActivityThreshold(rangeDays);
-  const top = topActivityThreshold(rangeDays);
-  if (effective < low) return "low";
-  if (effective < top) return "moderate";
-  return "top";
+  const low = lowActivityThreshold(
+    rangeDays,
+    catalogThresholds?.lowUsageMax30d
+  );
+  const top = topActivityThreshold(
+    rangeDays,
+    catalogThresholds?.topUsageMin30d
+  );
+  // Contrato: bajo ≤ lowUsageMax · top ≥ topUsageMin · medio en medio
+  if (effective <= low) return "low";
+  if (effective >= top) return "top";
+  return "moderate";
 }
 
 
@@ -159,43 +180,73 @@ export function adoptedModulesCount(dealer: Dealer): number {
   return dealer.modules.filter((m) => m.adopted).length;
 }
 
-export function engagementScore(dealer: Dealer): number {
+function clamp01(n: number) {
+  return Math.min(1, Math.max(0, n));
+}
+
+/**
+ * Score 0–100 con pesos del catálogo (volume / gap / capacity / recency).
+ */
+export function engagementScore(
+  dealer: Dealer,
+  weights: ScoringWeights = SEED_SCORING_WEIGHTS
+): number {
   if (dealer.accessType === "crm_only") return 0;
 
   const sessions = dealer.webSessions30d + dealer.mobileSessions30d;
-  const moduleActions = dealer.modules.reduce((sum, m) => sum + m.actions30d, 0);
-  const adoption = adoptedModulesCount(dealer) / MODULES.length;
-  const inventoryHealth =
-    dealer.inventoryCount === 0
-      ? 0
-      : dealer.inventoryPublished / dealer.inventoryCount;
+  const activeMods = adoptedModulesCount(dealer);
+  const missingKey = PRIORITY_MODULES.filter(
+    (key) => !dealer.modules.some((m) => m.module === key && m.adopted)
+  ).length;
+
+  const volume = clamp01(
+    dealer.leads30d / 200 + dealer.inventoryPublished / 120
+  );
+  const gap = clamp01(missingKey / PRIORITY_MODULES.length);
+  const capacity = clamp01(sessions / 400 + activeMods / MODULES.length);
+  const daysSinceLogin = dealer.lastLoginAt
+    ? (MOCK_NOW_MS - new Date(dealer.lastLoginAt).getTime()) /
+      (1000 * 60 * 60 * 24)
+    : 90;
+  const recency = clamp01(1 - daysSinceLogin / 45);
 
   const raw =
-    sessions * 0.35 +
-    moduleActions * 0.25 +
-    adoption * 200 +
-    inventoryHealth * 80 +
-    dealer.leads30d * 0.4;
+    volume * weights.volumeWeight +
+    gap * weights.gapWeight +
+    capacity * weights.capacityWeight +
+    recency * weights.recencyWeight;
 
-  return Math.round(Math.min(100, raw / 12));
+  return Math.round(clamp01(raw) * 100);
 }
 
-export function engagementLevel(dealer: Dealer): EngagementLevel {
+/**
+ * Semáforo Alto / Medio / Bajo según activity-thresholds.
+ * CRM only → dormant (fuera del semáforo de panel).
+ */
+export function engagementLevel(
+  dealer: Dealer,
+  thresholds: ActivityThresholds = SEED_ACTIVITY_THRESHOLDS
+): EngagementLevel {
   if (dealer.accessType === "crm_only") return "dormant";
-  if (!dealer.lastLoginAt) return "dormant";
 
-  /** Misma ancla que mock-data para SSR estable */
-  const now = new Date("2026-09-21T12:00:00.000Z").getTime();
-  const daysSinceLogin =
-    (now - new Date(dealer.lastLoginAt).getTime()) / (1000 * 60 * 60 * 24);
+  const sessions = dealer.webSessions30d + dealer.mobileSessions30d;
+  const activeMods = adoptedModulesCount(dealer);
+  const daysSinceLogin = dealer.lastLoginAt
+    ? (MOCK_NOW_MS - new Date(dealer.lastLoginAt).getTime()) /
+      (1000 * 60 * 60 * 24)
+    : 999;
 
-  if (daysSinceLogin > 21) return "dormant";
+  const isLow =
+    sessions <= thresholds.lowSessionsMax ||
+    daysSinceLogin >= thresholds.lowDaysWithoutSession;
+  if (isLow) return "low";
 
-  const score = engagementScore(dealer);
-  if (score >= 70) return "high";
-  if (score >= 40) return "medium";
-  if (score >= 15) return "low";
-  return "dormant";
+  const isHigh =
+    sessions >= thresholds.highSessionsMin &&
+    activeMods >= thresholds.highActiveModulesMin;
+  if (isHigh) return "high";
+
+  return "medium";
 }
 
 export function moduleAdoptionRate(
@@ -438,7 +489,15 @@ export type OutreachCandidate = {
  * Cola PM: champions (entrevista) o activos con gaps en módulos clave (demo).
  * Criterio amplio para el prototipo (incluye medium/low con gaps).
  */
-export function outreachCandidates(dealers: Dealer[]): OutreachCandidate[] {
+export function outreachCandidates(
+  dealers: Dealer[],
+  options?: {
+    thresholds?: ActivityThresholds;
+    weights?: ScoringWeights;
+  }
+): OutreachCandidate[] {
+  const thresholds = options?.thresholds ?? SEED_ACTIVITY_THRESHOLDS;
+  const weights = options?.weights ?? SEED_SCORING_WEIGHTS;
   const panel = dealers.filter((d) => d.accessType === "panel");
   const nameByKey = Object.fromEntries(
     MODULES.map((m) => [m.key, m.name])
@@ -447,8 +506,8 @@ export function outreachCandidates(dealers: Dealer[]): OutreachCandidate[] {
   const rows: OutreachCandidate[] = [];
 
   for (const dealer of panel) {
-    const level = engagementLevel(dealer);
-    const score = engagementScore(dealer);
+    const level = engagementLevel(dealer, thresholds);
+    const score = engagementScore(dealer, weights);
     const missing = PRIORITY_MODULES.filter(
       (key) => !dealer.modules.some((m) => m.module === key && m.adopted)
     ).map((key) => ({ key, name: nameByKey[key] }));
